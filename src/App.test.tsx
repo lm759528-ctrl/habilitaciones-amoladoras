@@ -1,8 +1,13 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { perfil, renderConAuth, sesion } from './test/renderConAuth'
+
+vi.mock('./lib/datos', () => ({
+  obtenerHabilitaciones: async () => [],
+  obtenerEmpresas: async () => [],
+}))
 
 describe('rutas y roles', () => {
   it('sin sesión manda al login', () => {

@@ -4,7 +4,7 @@ Aplicación web para registrar los exámenes prácticos de uso de amoladoras ang
 generar el PDF de la planilla y controlar qué operarios están habilitados, por vencer o
 vencidos. La spec completa está en [`docs/SPEC.md`](docs/SPEC.md).
 
-> Estado: **etapa 2 (login y roles)**. El listado, el examen con PDF, los avisos por mail y
+> Estado: **etapa 3 (listado)**. El examen con PDF, los avisos por mail y
 > la administración llegan en las etapas siguientes; este README se completa en cada una.
 
 Stack: React + Vite + TypeScript + Tailwind CSS, Supabase (Auth, Postgres, Storage) y
