@@ -4,7 +4,7 @@ import { NOMBRE_ROL, type Rol } from '../../auth/permisos'
 import { Cargando } from '../../components/Cargando'
 import { ErrorCarga } from '../../components/ErrorCarga'
 import { Aviso, Boton } from '../../components/ui'
-import { actualizarUsuario, invitarUsuario, mensajeErrorAdmin, obtenerUsuarios } from '../../lib/admin'
+import { actualizarUsuario, darAcceso, mensajeErrorAdmin, obtenerUsuarios } from '../../lib/admin'
 import { useConsulta } from '../../lib/useConsulta'
 import { Activo, Etiqueta, Tarjeta, claseBotonSec, claseInput } from './comunes'
 
@@ -14,7 +14,7 @@ const ROLES: Rol[] = ['admin', 'seguridad']
 export function AdminUsuarios() {
   const { perfil } = useAuth()
   const usuarios = useConsulta(obtenerUsuarios, [])
-  const [invitacion, setInvitacion] = useState({ email: '', nombre: '', rol: 'seguridad' as Rol })
+  const [acceso, setAcceso] = useState({ email: '', nombre: '', rol: 'seguridad' as Rol })
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
   const [ocupado, setOcupado] = useState(false)
 
@@ -34,18 +34,13 @@ export function AdminUsuarios() {
     }
   }
 
-  async function invitar(e: FormEvent) {
+  async function darleAcceso(e: FormEvent) {
     e.preventDefault()
     const listo = await ejecutar(
-      async () => {
-        const { existente } = await invitarUsuario(invitacion)
-        if (existente) {
-          return `${invitacion.email} ya tenía cuenta (por ejemplo, de otra app de la empresa): ahora tiene acceso y entra con su misma contraseña. Si no la recuerda, que use "Olvidé mi contraseña".`
-        }
-      },
-      `Se mandó la invitación a ${invitacion.email}. Va a recibir un link para elegir su contraseña.`,
+      () => darAcceso(acceso),
+      `Listo: ${acceso.email} ya puede entrar como ${NOMBRE_ROL[acceso.rol]}, con la contraseña que le pusiste en Supabase.`,
     )
-    if (listo) setInvitacion({ email: '', nombre: '', rol: 'seguridad' })
+    if (listo) setAcceso({ email: '', nombre: '', rol: 'seguridad' })
   }
 
   if (usuarios.cargando && !usuarios.datos) return <Cargando />
@@ -54,23 +49,27 @@ export function AdminUsuarios() {
   return (
     <div className="flex flex-col gap-4">
       <Tarjeta>
-        <form onSubmit={invitar} className="flex flex-col gap-3">
-          <h3 className="font-semibold text-slate-900">Invitar usuario</h3>
+        <form onSubmit={darleAcceso} className="flex flex-col gap-3">
+          <h3 className="font-semibold text-slate-900">Dar acceso a un usuario</h3>
+          <p className="text-sm text-slate-600">
+            Primero creá el usuario en Supabase (Authentication → Users → Add user → Create new user, con
+            "Auto Confirm User" marcado). Después cargá acá el mismo mail, su nombre y el rol.
+          </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Etiqueta texto="Email">
-              <input type="email" required value={invitacion.email} onChange={(e) => setInvitacion({ ...invitacion, email: e.target.value })} className={claseInput} />
+              <input type="email" required value={acceso.email} onChange={(e) => setAcceso({ ...acceso, email: e.target.value })} className={claseInput} />
             </Etiqueta>
             <Etiqueta texto="Nombre">
-              <input required value={invitacion.nombre} onChange={(e) => setInvitacion({ ...invitacion, nombre: e.target.value })} className={claseInput} />
+              <input required value={acceso.nombre} onChange={(e) => setAcceso({ ...acceso, nombre: e.target.value })} className={claseInput} />
             </Etiqueta>
             <Etiqueta texto="Rol">
-              <select value={invitacion.rol} onChange={(e) => setInvitacion({ ...invitacion, rol: e.target.value as Rol })} className={claseInput}>
+              <select value={acceso.rol} onChange={(e) => setAcceso({ ...acceso, rol: e.target.value as Rol })} className={claseInput}>
                 {ROLES.map((r) => <option key={r} value={r}>{NOMBRE_ROL[r]}</option>)}
               </select>
             </Etiqueta>
           </div>
-          <Boton type="submit" disabled={ocupado || !invitacion.email.trim() || !invitacion.nombre.trim()} className="self-start">
-            {ocupado ? 'Enviando…' : 'Enviar invitación'}
+          <Boton type="submit" disabled={ocupado || !acceso.email.trim() || !acceso.nombre.trim()} className="self-start">
+            {ocupado ? 'Guardando…' : 'Dar acceso'}
           </Boton>
         </form>
       </Tarjeta>

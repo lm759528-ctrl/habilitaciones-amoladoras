@@ -29,7 +29,7 @@ Seguridad e Higiene. La app maneja datos personales (DNI): nada se lee sin login
 | 3 | Listado | Resumen, tabla/tarjetas, búsqueda, filtros, exportar CSV/Excel, ver PDF. |
 | 4 | Nuevo examen y PDF | Checklist desde archivo de configuración, confirmación "No" + "Apto", PDF A4, subida a Storage. |
 | 5 | Avisos por mail | Edge Function + pg_cron 8:00 AR, umbrales configurables, Resend o SMTP Gmail. |
-| 6 | Administración | ABM empresas, personas y usuarios (invitar y asignar rol), anular exámenes. |
+| 6 | Administración | ABM empresas, personas y usuarios (dar acceso y rol a usuarios creados a mano en Supabase; sin invitaciones por mail), anular exámenes. |
 
 ## Proyecto de Supabase compartido
 
