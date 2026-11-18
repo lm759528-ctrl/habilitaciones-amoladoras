@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { perfil, renderConAuth, sesion } from '../test/renderConAuth'
@@ -9,6 +9,12 @@ const base = {
   descripcion_tarea: null, observaciones: null, pdf_path: 'p1/a.pdf', anulado: false, motivo_anulacion: null,
   created_at: '2026-01-01T12:00:00Z',
 }
+
+const anular = vi.fn(async (_id: string, _motivo: string) => {})
+vi.mock('../lib/admin', () => ({
+  anularExamen: (id: string, motivo: string) => anular(id, motivo),
+  mensajeErrorAdmin: () => 'error',
+}))
 
 vi.mock('../lib/datos', () => ({
   obtenerPersona: async (id: string) =>
@@ -25,12 +31,12 @@ vi.mock('../lib/datos', () => ({
   linkFirmadoPdf: async () => 'https://firmado.example/pdf',
 }))
 
-function render(ruta: string) {
+function render(ruta: string, rol: 'seguridad' | 'admin' = 'seguridad') {
   return renderConAuth(
     <Routes>
       <Route path="/personas/:id" element={<DetallePersona />} />
     </Routes>,
-    { session: sesion, perfil: perfil('seguridad') },
+    { session: sesion, perfil: perfil(rol) },
     ruta,
   )
 }
@@ -53,5 +59,25 @@ describe('DetallePersona', () => {
   it('avisa si la persona no existe', async () => {
     render('/personas/otra')
     expect(await screen.findByRole('heading', { name: 'Persona no encontrada' })).toBeInTheDocument()
+  })
+
+  it('Seguridad no ve el botón Anular', async () => {
+    render('/personas/p1')
+    await screen.findByRole('heading', { name: 'Zapata, Ana' })
+    expect(screen.queryByRole('button', { name: 'Anular' })).not.toBeInTheDocument()
+  })
+
+  it('el admin anula un examen con motivo obligatorio', async () => {
+    render('/personas/p1', 'admin')
+    await screen.findByRole('heading', { name: 'Zapata, Ana' })
+    // el examen ya anulado no ofrece el botón
+    expect(screen.getAllByRole('button', { name: 'Anular' })).toHaveLength(3)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Anular' })[0])
+    const confirmar = screen.getByRole('button', { name: 'Anular examen' })
+    expect(confirmar).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Se cargó a la persona equivocada' } })
+    fireEvent.click(confirmar)
+    await waitFor(() => expect(anular).toHaveBeenCalledWith('x3', 'Se cargó a la persona equivocada'))
+    expect(await screen.findByText('Se anuló el examen del 01/11/2026.')).toBeInTheDocument()
   })
 })

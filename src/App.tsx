@@ -2,13 +2,13 @@ import { Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { esAdmin, puedeCargarExamenes } from './auth/permisos'
 import { Layout } from './components/Layout'
+import { Administracion } from './pages/Administracion'
 import { DetallePersona } from './pages/DetallePersona'
 import { Listado } from './pages/Listado'
 import { Login } from './pages/Login'
 import { NoEncontrado } from './pages/NoEncontrado'
 import { NuevaContrasena } from './pages/NuevaContrasena'
 import { NuevoExamen } from './pages/NuevoExamen'
-import { Proximamente } from './pages/Proximamente'
 import { RecuperarContrasena } from './pages/RecuperarContrasena'
 
 export function App() {
@@ -39,7 +39,7 @@ export function App() {
           path="admin"
           element={
             <RequireAuth permitido={esAdmin}>
-              <Proximamente titulo="Administración" etapa={6} />
+              <Administracion />
             </RequireAuth>
           }
         />
