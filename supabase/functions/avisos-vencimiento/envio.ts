@@ -8,6 +8,12 @@ function env(nombre: string): string {
   return v
 }
 
+// Si el proyecto de Supabase lo comparte otra app con su propia cuenta de Resend,
+// esta app puede usar otra key con HABILITACIONES_RESEND_API_KEY sin pisar la de la otra.
+function claveResend(): string {
+  return Deno.env.get('HABILITACIONES_RESEND_API_KEY') || env('RESEND_API_KEY')
+}
+
 export async function enviarMail(para: string, mail: Mail): Promise<void> {
   const proveedor = (Deno.env.get('EMAIL_PROVIDER') ?? 'resend').toLowerCase()
   const de = env('EMAIL_FROM')
@@ -15,7 +21,7 @@ export async function enviarMail(para: string, mail: Mail): Promise<void> {
   if (proveedor === 'resend') {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${env('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${claveResend()}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: de, to: para.split(',').map((s) => s.trim()), subject: mail.asunto, html: mail.html, text: mail.texto }),
     })
     if (!r.ok) throw new Error(`Resend respondió ${r.status}: ${await r.text()}`)

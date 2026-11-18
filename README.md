@@ -117,7 +117,9 @@ SQL Editor: `update habilitaciones.configuracion set dias_aviso = '{30,15,7,0}';
    - **Gmail**: activá la verificación en dos pasos en la cuenta y creá una
      [contraseña de aplicación](https://myaccount.google.com/apppasswords). Se usa el puerto 465,
      porque Supabase bloquea el 587.
-   Si el proyecto ya tiene `RESEND_API_KEY` (por ejemplo, de otra app), se usa la misma.
+   Si el proyecto ya tiene `RESEND_API_KEY` de otra app, podés usar la misma o, si esta app usa
+   otra cuenta de Resend, cargar su key como `HABILITACIONES_RESEND_API_KEY` (tiene prioridad y
+   no pisa la de la otra app).
 2. Cargá los secretos de [`supabase/functions/.env.example`](supabase/functions/.env.example) en
    **Supabase → Edge Functions → Secrets** (se pueden pegar todos juntos como `NOMBRE=valor`), o
    desde la terminal con `npx supabase secrets set --env-file supabase/functions/.env`.
