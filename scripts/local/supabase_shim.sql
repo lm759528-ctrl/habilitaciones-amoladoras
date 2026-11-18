@@ -76,3 +76,25 @@ create table storage.objects (
 alter table storage.objects enable row level security;
 
 grant all on storage.buckets, storage.objects to anon, authenticated, service_role;
+
+-- pg_cron / pg_net / vault ------------------------------------------------
+-- En un Postgres común no están: se imitan solo lo necesario para que las
+-- migraciones apliquen y los tests puedan revisar el job programado.
+create schema if not exists cron;
+create table cron.job (jobname text primary key, schedule text, command text);
+create function cron.schedule(p_nombre text, p_cron text, p_comando text) returns bigint
+language sql as $$
+  insert into cron.job values (p_nombre, p_cron, p_comando)
+  on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command;
+  select 1::bigint;
+$$;
+
+create schema if not exists net;
+create table net.llamadas (id bigserial primary key, url text, headers jsonb, body jsonb);
+create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
+returns bigint language sql as $$
+  insert into net.llamadas (url, headers, body) values (url, headers, body) returning id;
+$$;
+
+create schema if not exists vault;
+create table vault.decrypted_secrets (name text primary key, decrypted_secret text);
