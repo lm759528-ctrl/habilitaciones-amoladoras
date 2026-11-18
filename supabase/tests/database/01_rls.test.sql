@@ -1,7 +1,7 @@
 -- Tests de permisos: RLS, grants y bucket privado.
 begin;
 create extension if not exists pgtap with schema extensions;
-set search_path = public, extensions;
+set search_path = habilitaciones, extensions;
 
 select plan(45);
 
@@ -9,37 +9,38 @@ select plan(45);
 -- Datos de prueba (como postgres, dueño de las tablas)
 -- ---------------------------------------------------------------------------
 insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data) values
-  ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local',     '{"rol":"admin","nombre":"Ana Admin"}', '{}'),
-  ('00000000-0000-0000-0000-0000000000a2', 'seguridad@test.local', '{"rol":"seguridad"}', '{}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local',     '{"habilitaciones_rol":"admin","nombre":"Ana Admin"}', '{}'),
+  ('00000000-0000-0000-0000-0000000000a2', 'seguridad@test.local', '{"habilitaciones_rol":"seguridad"}', '{}'),
   -- Usuario sin rol en app_metadata (p. ej. un registro público por error),
-  -- que además intenta darse admin por user_metadata.
-  ('00000000-0000-0000-0000-0000000000a3', 'intruso@test.local',   '{}', '{"rol":"admin"}');
+  -- que además intenta darse admin por user_metadata. Tiene un "rol" de otra app
+  -- del mismo proyecto de Supabase, que acá no cuenta.
+  ('00000000-0000-0000-0000-0000000000a3', 'intruso@test.local',   '{"rol":"admin"}', '{"habilitaciones_rol":"admin"}');
 
 insert into empresas (id, nombre) values ('00000000-0000-0000-0000-0000000000e1', 'Contratista Uno');
 insert into personas (id, nombre, apellido, dni, empresa_id) values
   ('00000000-0000-0000-0000-0000000000b1', 'Juan', 'Pérez', '30111222', '00000000-0000-0000-0000-0000000000e1');
 insert into examenes (id, persona_id, fecha_examen, controlo, resultado, tipo_habilitacion, respuestas) values
-  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b1', private.hoy_ar(), 'Evaluador', 'apto', 'anual',
+  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b1', habilitaciones_priv.hoy_ar(), 'Evaluador', 'apto', 'anual',
    '{"version":1,"secciones":[{"titulo":"S","items":[{"id":"a","texto":"A","respuesta":"si","comentario":""}]}]}');
 insert into avisos_enviados (examen_id, umbral_dias) values ('00000000-0000-0000-0000-0000000000c1', 30);
-insert into storage.objects (bucket_id, name) values ('examenes-pdf', 'b1/c1.pdf');
+insert into storage.objects (bucket_id, name) values ('habilitaciones-examenes', 'b1/c1.pdf');
 
 -- ---------------------------------------------------------------------------
 -- Estructura
 -- ---------------------------------------------------------------------------
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity),
-  0, 'RLS está activado en todas las tablas de public');
+   where n.nspname = 'habilitaciones' and c.relkind = 'r' and not c.relrowsecurity),
+  0, 'RLS está activado en todas las tablas de habilitaciones');
 
 select ok(
   (select bool_and(coalesce(c.reloptions @> array['security_invoker=true'], false))
    from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind = 'v'),
-  'todas las vistas de public usan security_invoker');
+   where n.nspname = 'habilitaciones' and c.relkind = 'v'),
+  'todas las vistas de habilitaciones usan security_invoker');
 
-select is((select public from storage.buckets where id = 'examenes-pdf'), false, 'el bucket de PDFs es privado');
-select is((select allowed_mime_types from storage.buckets where id = 'examenes-pdf'), array['application/pdf'], 'el bucket solo acepta PDFs');
+select is((select public from storage.buckets where id = 'habilitaciones-examenes'), false, 'el bucket de PDFs es privado');
+select is((select allowed_mime_types from storage.buckets where id = 'habilitaciones-examenes'), array['application/pdf'], 'el bucket solo acepta PDFs');
 
 -- ---------------------------------------------------------------------------
 -- Creación de perfiles
@@ -53,10 +54,10 @@ select is((select count(*)::int from profiles where id = '00000000-0000-0000-000
 -- Sin login (anon)
 -- ---------------------------------------------------------------------------
 set local role anon;
-select throws_ok('select * from personas', '42501', null, 'anon no puede leer personas');
-select throws_ok('select * from examenes', '42501', null, 'anon no puede leer exámenes');
-select throws_ok('select * from habilitaciones_actuales', '42501', null, 'anon no puede leer el listado');
-select throws_ok('select * from profiles', '42501', null, 'anon no puede leer perfiles');
+select throws_ok('select * from habilitaciones.personas', '42501', null, 'anon no puede leer personas');
+select throws_ok('select * from habilitaciones.examenes', '42501', null, 'anon no puede leer exámenes');
+select throws_ok('select * from habilitaciones.habilitaciones_actuales', '42501', null, 'anon no puede leer el listado');
+select throws_ok('select * from habilitaciones.profiles', '42501', null, 'anon no puede leer perfiles');
 select is((select count(*)::int from storage.objects), 0, 'anon no ve PDFs');
 reset role;
 
@@ -81,7 +82,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select is((select count(*)::int from personas), 1, 'seguridad ve personas');
 select is((select count(*)::int from examenes), 1, 'seguridad ve exámenes');
 select is((select count(*)::int from habilitaciones_actuales), 1, 'seguridad ve el listado');
-select is((select count(*)::int from storage.objects where bucket_id = 'examenes-pdf'), 1, 'seguridad puede leer PDFs (URL firmada)');
+select is((select count(*)::int from storage.objects where bucket_id = 'habilitaciones-examenes'), 1, 'seguridad puede leer PDFs (URL firmada)');
 select is((select count(*)::int from profiles), 1, 'seguridad solo ve su propio perfil');
 select is((select count(*)::int from avisos_enviados), 0, 'seguridad no ve avisos enviados');
 select throws_ok($$insert into empresas (nombre) values ('X')$$, '42501', null, 'seguridad no crea empresas');
@@ -91,7 +92,7 @@ select throws_ok($$insert into examenes (persona_id, fecha_examen, controlo, res
   values ('00000000-0000-0000-0000-0000000000b1', current_date, 'X', 'no_apto', 'anual',
   '{"secciones":[{"titulo":"S","items":[]}]}', '00000000-0000-0000-0000-0000000000a2')$$,
   '42501', null, 'seguridad no carga exámenes');
-select throws_ok($$insert into storage.objects (bucket_id, name) values ('examenes-pdf', 'x.pdf')$$, '42501', null, 'seguridad no sube PDFs');
+select throws_ok($$insert into storage.objects (bucket_id, name) values ('habilitaciones-examenes', 'x.pdf')$$, '42501', null, 'seguridad no sube PDFs');
 select is_empty($$update personas set nombre = 'Hack' returning id$$, 'seguridad no edita personas');
 select is_empty($$update examenes set anulado = true, motivo_anulacion = 'x' returning id$$, 'seguridad no anula exámenes');
 select is_empty($$update profiles set rol = 'admin' returning id$$, 'seguridad no puede darse rol admin');
@@ -118,7 +119,7 @@ select throws_ok($$insert into examenes (persona_id, fecha_examen, controlo, res
   values ('00000000-0000-0000-0000-0000000000b2', current_date, 'X', 'no_apto', 'anual',
   '{"secciones":[{"titulo":"S","items":[]}]}', '00000000-0000-0000-0000-0000000000a2')$$,
   '42501', null, 'no se puede cargar un examen a nombre de otro usuario');
-select lives_ok($$insert into storage.objects (bucket_id, name) values ('examenes-pdf', 'b2/c2.pdf')$$, 'admin sube PDFs');
+select lives_ok($$insert into storage.objects (bucket_id, name) values ('habilitaciones-examenes', 'b2/c2.pdf')$$, 'admin sube PDFs');
 select isnt_empty($$update examenes set observaciones = 'ok' where id = '00000000-0000-0000-0000-0000000000c2' returning id$$, 'admin edita exámenes');
 select is((select count(*)::int from profiles), 2, 'admin ve todos los perfiles');
 select is((select count(*)::int from avisos_enviados), 1, 'admin ve avisos enviados');

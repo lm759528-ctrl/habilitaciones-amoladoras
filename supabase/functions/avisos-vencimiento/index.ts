@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
   // Service role: lee todo sin RLS. La key la inyecta Supabase en la función.
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },
+    db: { schema: 'habilitaciones' },
   })
 
   try {

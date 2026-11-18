@@ -11,24 +11,45 @@ Cloudflare Pages.
 
 ## 1. Configurar Supabase
 
-1. Creá un proyecto en [supabase.com](https://supabase.com) (región São Paulo es la más cercana).
-2. Aplicá las migraciones desde tu PC:
+La app puede ir en un proyecto de Supabase propio o en uno que ya uses para otra cosa (por
+ejemplo, si el plan gratis no te deja crear más proyectos). Todo lo suyo queda aparte:
 
-   ```bash
-   npx supabase login
-   npx supabase link --project-ref <ref-del-proyecto>
-   npx supabase db push
-   ```
+- tablas y vistas en el esquema **`habilitaciones`** (no toca `public`);
+- funciones internas en **`habilitaciones_priv`**;
+- bucket **`habilitaciones-examenes`**, job de cron **`habilitaciones-avisos`** y secretos de
+  Vault con prefijo `habilitaciones_`;
+- el rol de cada usuario va en `app_metadata.habilitaciones_rol`. Los usuarios de la otra app
+  no ven nada acá hasta que un admin les da acceso.
 
-3. En **Authentication → Sign In / Providers**, desactivá **Allow new users to sign up**:
-   los usuarios los crea solo el administrador. (La base igual está protegida: un usuario sin
-   `rol` en `app_metadata` no recibe perfil y no ve nada.)
-4. En **Authentication → Sign In / Providers → Email**, poné el largo mínimo de contraseña en 8.
-5. En **Authentication → URL Configuration**:
-   - **Site URL**: la dirección de la app en Cloudflare, por ejemplo `https://habilitaciones-amoladoras.pages.dev`.
-   - **Redirect URLs**: agregá `https://habilitaciones-amoladoras.pages.dev/nueva-contrasena`
-     (y `http://localhost:5173/nueva-contrasena` si vas a probar en tu PC).
-     Es adonde llevan los links de invitación y de "olvidé mi contraseña".
+Pasos:
+
+1. Si vas a usar un proyecto nuevo, crealo en [supabase.com](https://supabase.com) (región São Paulo).
+2. Creá las tablas, de una de estas dos formas:
+   - **SQL Editor** (recomendado si el proyecto ya tiene otra app): pegá y ejecutá, uno por uno
+     y en orden, los archivos de [`supabase/migrations/`](supabase/migrations/)
+     (`…000100_esquema_base.sql`, `…000200_vistas.sql`, `…000300_rls.sql`, `…000400_storage.sql`
+     y `…000500_cron_avisos.sql`). Cada uno tiene que terminar en "Success".
+   - **Terminal**, en un proyecto nuevo:
+
+     ```bash
+     npx supabase login
+     npx supabase link --project-ref <ref-del-proyecto>
+     npx supabase db push
+     ```
+
+3. En **Project Settings → Data API → Exposed schemas** (en algunos paneles, **API Settings**),
+   agregá `habilitaciones` a la lista y guardá. Sin esto la app no ve las tablas.
+4. En **Authentication → URL Configuration → Redirect URLs**, agregá
+   `https://habilitaciones-amoladoras.pages.dev/nueva-contrasena`
+   (y `http://localhost:5173/nueva-contrasena` si vas a probar en tu PC). Es adonde llevan los
+   links de invitación y de "olvidé mi contraseña".
+5. Opciones de login que valen para todo el proyecto (si lo compartís, decidí pensando en la otra app):
+   - **Site URL**: si el proyecto es solo de esta app, poné la dirección de Cloudflare. Si es
+     compartido, dejá la de la otra app: esta app siempre manda su propia dirección de regreso.
+   - **Allow new users to sign up** (Sign In / Providers): en un proyecto propio, desactivalo.
+     Si la otra app necesita registro público, dejalo como está: acá un usuario sin
+     `habilitaciones_rol` no recibe perfil y no ve nada.
+   - **Largo mínimo de contraseña** (Sign In / Providers → Email): 8 o más, si no afecta a la otra app.
 
 ## 2. Crear el primer administrador
 
@@ -43,7 +64,8 @@ node --env-file=.env.local scripts/crear-admin.mjs admin@empresa.com "Nombre Ape
 Te pide la contraseña sin mostrarla. Si el usuario ya existía, lo convierte en admin.
 
 Opción B, desde el panel de Supabase: creá el usuario en **Authentication → Users → Add user**
-(marcando *Auto Confirm User*) y ejecutá [`scripts/promover-admin.sql`](scripts/promover-admin.sql)
+(marcando *Auto Confirm User*). Si ya tenés usuario en ese proyecto (por la otra app), salteá
+este paso y usá el mismo: vas a entrar con la misma contraseña. Después ejecutá [`scripts/promover-admin.sql`](scripts/promover-admin.sql)
 en el **SQL Editor**, cambiando el email y el nombre.
 
 > La `service_role` key saltea todos los permisos. Usala solo en tu PC: nunca la pongas en
@@ -60,6 +82,7 @@ También se pueden crear con la opción B, cambiando `'admin'` por `'seguridad'`
    - **Build command**: `npm run build`
    - **Build output directory**: `dist`
    - La versión de Node la toma del archivo `.node-version` (22).
+   - **Root directory**: vacío.
 3. En **Settings → Variables and Secrets** (para Production y Preview):
 
    | Variable | Valor |
@@ -69,7 +92,7 @@ También se pueden crear con la opción B, cambiando `'admin'` por `'seguridad'`
    | `VITE_APP_TITLE` | El título que quieras mostrar (opcional) |
 
 4. Guardá y hacé **Retry deployment** para que el build tome las variables.
-5. Volvé a Supabase y completá la **Site URL** y las **Redirect URLs** con la dirección final.
+5. Volvé a Supabase y revisá que la **Redirect URL** (sección 1, paso 4) tenga la dirección final.
 
 El repo ya trae `public/_redirects` (para que funcionen las rutas al recargar la página) y
 `public/_headers` (cabeceras de seguridad). Si preferís publicar desde la terminal en vez de
@@ -84,7 +107,7 @@ personas que ya renovaron ni de personas dadas de baja. Si un día no hay nada p
 llega mail.
 
 Los umbrales están en la tabla `configuracion` (columna `dias_aviso`). Para cambiarlos, en el
-SQL Editor: `update configuracion set dias_aviso = '{30,15,7,0}';`
+SQL Editor: `update habilitaciones.configuracion set dias_aviso = '{30,15,7,0}';`
 
 ### Configurar el envío
 
@@ -103,13 +126,13 @@ SQL Editor: `update configuracion set dias_aviso = '{30,15,7,0}';`
 
 ### Programar el cron
 
-La migración `20261118000500_cron_avisos.sql` ya deja programado el job `avisos-vencimiento`
+La migración `20261118000500_cron_avisos.sql` ya deja programado el job `habilitaciones-avisos`
 (`0 11 * * *`, o sea 8:00 en Argentina). Falta decirle a qué URL llamar y con qué secreto.
 En el **SQL Editor** de Supabase ejecutá, con tu `ref` y el mismo `CRON_SECRET` del paso anterior:
 
 ```sql
-select vault.create_secret('https://<ref>.supabase.co/functions/v1/avisos-vencimiento', 'avisos_url');
-select vault.create_secret('<CRON_SECRET>', 'avisos_cron_secret');
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/avisos-vencimiento', 'habilitaciones_avisos_url');
+select vault.create_secret('<CRON_SECRET>', 'habilitaciones_cron_secret');
 ```
 
 ### Probarlo
@@ -136,7 +159,9 @@ La pantalla **Administración** (solo admin) tiene tres solapas:
   ofrecen al cargar exámenes nuevos; los exámenes viejos mantienen su empresa.
 - **Usuarios**: invitar por mail (rol Administrador o Seguridad e Higiene), cambiar el rol y
   dar de baja/reactivar. Un usuario dado de baja no ve nada aunque tenga contraseña. La base
-  no deja quitar ni dar de baja al último administrador activo.
+  no deja quitar ni dar de baja al último administrador activo. Si el email ya tiene cuenta en
+  el proyecto de Supabase (por ejemplo, de la otra app), no se manda mail: se le da acceso y
+  entra con la contraseña que ya tiene.
 
 En el detalle de una persona, el admin puede **anular** un examen indicando el motivo. El examen
 no se borra: queda en el historial marcado como anulado y deja de contar como habilitación.
@@ -187,15 +212,15 @@ Se pueden cambiar los textos, agregar o quitar puntos y secciones sin tocar el c
 - Los exámenes ya cargados guardan su propia copia de la checklist, así que no cambian.
 
 Al guardar un examen, la app genera el PDF A4 en el navegador, lo sube al bucket privado
-`examenes-pdf` (ruta `<persona>/<examen>.pdf`) y después registra el examen.
+`habilitaciones-examenes` (ruta `<persona>/<examen>.pdf`) y después registra el examen.
 
 ## Base de datos
 
 Las migraciones están en `supabase/migrations/` y crean:
 
-- tablas `profiles`, `empresas`, `personas`, `examenes`, `avisos_enviados` y `configuracion`;
+- en el esquema `habilitaciones`: tablas `profiles`, `empresas`, `personas`, `examenes`, `avisos_enviados` y `configuracion`;
 - vistas `examenes_estado` (historial) y `habilitaciones_actuales` (listado);
-- políticas RLS en todas las tablas y el bucket privado `examenes-pdf`.
+- políticas RLS en todas las tablas y el bucket privado `habilitaciones-examenes`.
 
 ### Tests de la base
 

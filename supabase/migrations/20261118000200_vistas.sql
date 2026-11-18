@@ -5,11 +5,11 @@
 -- Todos los exámenes con días restantes y estado calculado (historial).
 -- 'renovado': hay un apto anual o semestral más nuevo. Una tarea puntual no
 -- renueva ni inhabilita otra habilitación.
-create view public.examenes_estado
+create view habilitaciones.examenes_estado
 with (security_invoker = true)
 as
 with umbral as (
-  select coalesce((select max(d) from public.configuracion c, unnest(c.dias_aviso) d), 30) as dias
+  select coalesce((select max(d) from habilitaciones.configuracion c, unnest(c.dias_aviso) d), 30) as dias
 )
 select
   e.id,
@@ -27,13 +27,13 @@ select
   e.anulado,
   e.motivo_anulacion,
   e.created_at,
-  case when e.resultado = 'apto' then e.fecha_vencimiento - private.hoy_ar() end as dias_restantes,
+  case when e.resultado = 'apto' then e.fecha_vencimiento - habilitaciones_priv.hoy_ar() end as dias_restantes,
   case
     when e.anulado then 'anulado'
     when e.resultado = 'no_apto' then 'no_apto'
     when exists (
       select 1
-      from public.examenes n
+      from habilitaciones.examenes n
       where n.persona_id = e.persona_id
         and n.id <> e.id
         and not n.anulado
@@ -41,13 +41,13 @@ select
         and n.tipo_habilitacion in ('anual', 'semestral')
         and (n.fecha_examen, n.created_at) > (e.fecha_examen, e.created_at)
     ) then 'renovado'
-    when e.fecha_vencimiento < private.hoy_ar() then 'vencido'
-    when e.fecha_vencimiento - private.hoy_ar() <= (select dias from umbral) then 'por_vencer'
+    when e.fecha_vencimiento < habilitaciones_priv.hoy_ar() then 'vencido'
+    when e.fecha_vencimiento - habilitaciones_priv.hoy_ar() <= (select dias from umbral) then 'por_vencer'
     else 'vigente'
   end as estado
-from public.examenes e;
+from habilitaciones.examenes e;
 
-comment on view public.examenes_estado is
+comment on view habilitaciones.examenes_estado is
   'Exámenes con estado: anulado, no_apto, renovado, vencido, por_vencer o vigente.';
 
 -- Una fila por persona (listado), elegida así:
@@ -55,7 +55,7 @@ comment on view public.examenes_estado is
 --      primero anual/semestral, después tarea puntual, y la más reciente.
 --      Un examen posterior, aunque sea "No apto", no la inhabilita.
 --   2. Si no, su último examen no anulado (vencido o no apto).
-create view public.habilitaciones_actuales
+create view habilitaciones.habilitaciones_actuales
 with (security_invoker = true)
 as
 select distinct on (e.persona_id)
@@ -77,9 +77,9 @@ select distinct on (e.persona_id)
   e.dias_restantes,
   e.estado,
   e.pdf_path
-from public.examenes_estado e
-join public.personas p on p.id = e.persona_id
-join public.empresas em on em.id = e.empresa_id
+from habilitaciones.examenes_estado e
+join habilitaciones.personas p on p.id = e.persona_id
+join habilitaciones.empresas em on em.id = e.empresa_id
 where not e.anulado
 order by
   e.persona_id,
@@ -88,5 +88,5 @@ order by
   e.fecha_examen desc,
   e.created_at desc;
 
-comment on view public.habilitaciones_actuales is
+comment on view habilitaciones.habilitaciones_actuales is
   'Habilitación actual de cada persona con su estado (ver reglas en la migración).';

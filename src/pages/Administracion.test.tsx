@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { perfil, renderConAuth, sesion } from '../test/renderConAuth'
 import { Administracion } from './Administracion'
 
-const invitar = vi.fn(async (_d: unknown) => {})
+const invitar = vi.fn(async (_d: unknown) => ({ existente: false }))
 const guardarEmpresa = vi.fn(async (_d: unknown) => {})
 
 vi.mock('../lib/admin', () => ({
@@ -51,5 +51,15 @@ describe('Administracion', () => {
     await waitFor(() =>
       expect(invitar).toHaveBeenCalledWith(expect.objectContaining({ email: 'nuevo@planta.local', nombre: 'Pedro Gómez' })),
     )
+  })
+
+  it('si el email ya tenía cuenta de otra app, avisa que entra con su contraseña', async () => {
+    invitar.mockResolvedValueOnce({ existente: true })
+    render('/admin?seccion=usuarios')
+    await screen.findByText('Laura Seguridad')
+    fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'ya@planta.local' } })
+    fireEvent.change(screen.getByLabelText(/Nombre/), { target: { value: 'Ya Existe' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar invitación' }))
+    expect(await screen.findByText(/ya tenía cuenta/)).toBeInTheDocument()
   })
 })
