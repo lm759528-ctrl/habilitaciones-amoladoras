@@ -203,7 +203,8 @@ no se borra: queda en el historial marcado como anulado y deja de contar como ha
 
 ### Crear usuarios
 
-Los usuarios se crean siempre a mano (la app no manda invitaciones):
+Paso a paso detallado en [`docs/CREAR-USUARIOS.md`](docs/CREAR-USUARIOS.md). En resumen, los
+usuarios se crean siempre a mano (la app no manda invitaciones):
 
 1. En Supabase → **Authentication → Users → Add user → Create new user**: cargá el mail y una
    contraseña, marcá **Auto Confirm User** y tocá **Create user**. (Si la persona ya tiene usuario
