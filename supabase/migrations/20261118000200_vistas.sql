@@ -3,6 +3,8 @@
 -- de quien consulta (sin eso, una vista corre con los permisos de su dueño).
 
 -- Todos los exámenes con días restantes y estado calculado (historial).
+-- 'renovado': hay un apto anual o semestral más nuevo. Una tarea puntual no
+-- renueva ni inhabilita otra habilitación.
 create view public.examenes_estado
 with (security_invoker = true)
 as
@@ -36,6 +38,7 @@ select
         and n.id <> e.id
         and not n.anulado
         and n.resultado = 'apto'
+        and n.tipo_habilitacion in ('anual', 'semestral')
         and (n.fecha_examen, n.created_at) > (e.fecha_examen, e.created_at)
     ) then 'renovado'
     when e.fecha_vencimiento < private.hoy_ar() then 'vencido'
@@ -47,9 +50,11 @@ from public.examenes e;
 comment on view public.examenes_estado is
   'Exámenes con estado: anulado, no_apto, renovado, vencido, por_vencer o vigente.';
 
--- Una fila por persona: su examen más reciente que no esté anulado (listado).
--- Si el último examen es "No apto", la persona figura como no_apto aunque
--- tenga un apto anterior todavía en fecha.
+-- Una fila por persona (listado), elegida así:
+--   1. Si tiene alguna habilitación en fecha (vigente o por vencer), esa:
+--      primero anual/semestral, después tarea puntual, y la más reciente.
+--      Un examen posterior, aunque sea "No apto", no la inhabilita.
+--   2. Si no, su último examen no anulado (vencido o no apto).
 create view public.habilitaciones_actuales
 with (security_invoker = true)
 as
@@ -76,7 +81,12 @@ from public.examenes_estado e
 join public.personas p on p.id = e.persona_id
 join public.empresas em on em.id = e.empresa_id
 where not e.anulado
-order by e.persona_id, e.fecha_examen desc, e.created_at desc;
+order by
+  e.persona_id,
+  e.estado in ('vigente', 'por_vencer') desc,
+  (e.estado in ('vigente', 'por_vencer') and e.tipo_habilitacion <> 'tarea_puntual') desc,
+  e.fecha_examen desc,
+  e.created_at desc;
 
 comment on view public.habilitaciones_actuales is
-  'Habilitación actual de cada persona (último examen no anulado) con su estado.';
+  'Habilitación actual de cada persona con su estado (ver reglas en la migración).';

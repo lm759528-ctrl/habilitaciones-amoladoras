@@ -14,7 +14,8 @@ Seguridad e Higiene. La app maneja datos personales (DNI): nada se lee sin login
 
 ## Stack
 
-- Frontend: React + Vite + TypeScript + Tailwind CSS, deploy en Vercel o Netlify.
+- Frontend: React + Vite + TypeScript + Tailwind CSS, deploy en **Cloudflare Pages** (sitio estático,
+  con `public/_redirects` para que las rutas de la SPA caigan en `index.html`).
 - Backend: Supabase (Auth, Postgres, Storage, Edge Functions, pg_cron).
 - Español de Argentina, fechas dd/mm/aaaa, zona horaria `America/Argentina/Buenos_Aires`.
 - Diseño neutro, sin marcas; título de la app configurable (`VITE_APP_TITLE`).
@@ -24,7 +25,7 @@ Seguridad e Higiene. La app maneja datos personales (DNI): nada se lee sin login
 | # | Etapa | Contenido |
 |---|---|---|
 | 1 | Base de datos y RLS | Migraciones: tablas, vistas, políticas RLS, bucket privado. Tests de base de datos. |
-| 2 | Login y roles | Proyecto Vite, login con Supabase Auth, rutas por rol, script del primer admin. |
+| 2 | Login y roles | Proyecto Vite listo para Cloudflare Pages, login con Supabase Auth, rutas por rol, script del primer admin. |
 | 3 | Listado | Resumen, tabla/tarjetas, búsqueda, filtros, exportar CSV/Excel, ver PDF. |
 | 4 | Nuevo examen y PDF | Checklist desde archivo de configuración, confirmación "No" + "Apto", PDF A4, subida a Storage. |
 | 5 | Avisos por mail | Edge Function + pg_cron 8:00 AR, umbrales configurables, Resend o SMTP Gmail. |
@@ -41,7 +42,7 @@ Seguridad e Higiene. La app maneja datos personales (DNI): nada se lee sin login
 | `avisos_enviados` | Qué aviso (umbral en días) ya se mandó para cada examen. |
 | `configuracion` | Fila única con los umbrales de aviso (`dias_aviso`, por defecto `{30,7,0}`). |
 | vista `examenes_estado` | Todos los exámenes con `dias_restantes` y `estado` (para el historial). |
-| vista `habilitaciones_actuales` | Una fila por persona: su examen más reciente no anulado, con estado (para el listado). |
+| vista `habilitaciones_actuales` | Una fila por persona con su habilitación actual y su estado (para el listado). |
 
 ### Estados
 
@@ -51,10 +52,18 @@ Calculados con la fecha de hoy en Buenos Aires:
 |---|---|
 | `anulado` | El examen fue anulado (solo en el historial; el listado los ignora). |
 | `no_apto` | Resultado "No apto": no genera habilitación. |
-| `renovado` | Apto, pero hay un examen apto más nuevo de la misma persona. |
+| `renovado` | Apto, pero hay un apto **anual o semestral** más nuevo de la misma persona. Una tarea puntual no renueva otra habilitación. |
 | `vencido` | `fecha_vencimiento` < hoy. |
 | `por_vencer` | Faltan como mucho tantos días como el umbral de aviso más grande. |
 | `vigente` | El resto de los aptos. |
+
+### Qué examen muestra el listado
+
+Un examen posterior no inhabilita una habilitación que sigue en fecha (confirmado por Lucas):
+
+1. Si la persona tiene alguna habilitación vigente o por vencer, se muestra esa: primero
+   anual o semestral, después tarea puntual, y entre iguales la más reciente.
+2. Si no tiene ninguna en fecha, se muestra su último examen no anulado (vencido o no apto).
 
 ### Reglas de vencimiento
 

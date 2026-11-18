@@ -7,6 +7,11 @@ vencidos. La spec completa está en [`docs/SPEC.md`](docs/SPEC.md).
 > Estado: **etapa 1 (base de datos y RLS)**. El frontend, los avisos por mail y la
 > administración llegan en las etapas siguientes; este README se completa en cada una.
 
+## Deploy
+
+El frontend se publica en **Cloudflare Pages** como sitio estático (build de Vite en `dist/`).
+Los pasos completos llegan en la etapa 2, junto con el proyecto del frontend.
+
 ## Base de datos (Supabase)
 
 Las migraciones están en `supabase/migrations/` y crean:

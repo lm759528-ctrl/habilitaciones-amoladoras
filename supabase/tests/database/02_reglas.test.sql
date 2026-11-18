@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(35);
+select plan(41);
 
 insert into auth.users (id, email, raw_app_meta_data) values
   ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local', '{"rol":"admin"}'),
@@ -19,7 +19,11 @@ insert into personas (id, nombre, apellido, dni, empresa_id) values
   ('00000000-0000-0000-0000-000000000003', 'Vencido',   'C', '10000003', '00000000-0000-0000-0000-0000000000e1'),
   ('00000000-0000-0000-0000-000000000004', 'NoApto',    'D', '10000004', '00000000-0000-0000-0000-0000000000e1'),
   ('00000000-0000-0000-0000-000000000005', 'Renovado',  'E', '10000005', '00000000-0000-0000-0000-0000000000e1'),
-  ('00000000-0000-0000-0000-000000000006', 'Anulado',   'F', '10000006', '00000000-0000-0000-0000-0000000000e1');
+  ('00000000-0000-0000-0000-000000000006', 'Anulado',   'F', '10000006', '00000000-0000-0000-0000-0000000000e1'),
+  ('00000000-0000-0000-0000-000000000007', 'AptoLuegoNoApto',  'G', '10000007', '00000000-0000-0000-0000-0000000000e1'),
+  ('00000000-0000-0000-0000-000000000008', 'AnualMasTarea',    'H', '10000008', '00000000-0000-0000-0000-0000000000e1'),
+  ('00000000-0000-0000-0000-000000000009', 'SoloTareaVigente', 'I', '10000009', '00000000-0000-0000-0000-0000000000e1'),
+  ('00000000-0000-0000-0000-000000000010', 'VencidoLuegoNoApto', 'J', '10000010', '00000000-0000-0000-0000-0000000000e1');
 
 -- Respuestas válidas mínimas, para no repetir.
 create temp table r as select
@@ -120,7 +124,36 @@ select is((select dias_restantes from habilitaciones_actuales where persona_id =
 select is((select examen_id from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000005'),
   '00000000-0000-0000-0000-0000000000d2'::uuid, 'el listado muestra el examen más nuevo');
 select is((select estado from examenes_estado where id = '00000000-0000-0000-0000-0000000000d1'), 'renovado', 'el examen viejo figura como renovado');
-select is((select count(*)::int from habilitaciones_actuales), 6, 'una fila por persona');
+-- Un examen nuevo no inhabilita una habilitación vigente.
+insert into examenes (id, persona_id, fecha_examen, controlo, resultado, tipo_habilitacion, descripcion_tarea, fecha_vencimiento, respuestas)
+select '00000000-0000-0000-0000-000000000e71'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, private.hoy_ar() - 30, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, null, null::date, ok from r
+union all
+select '00000000-0000-0000-0000-000000000e72', '00000000-0000-0000-0000-000000000007', private.hoy_ar() - 1, 'X', 'no_apto', 'anual', null, null, ok from r
+union all
+select '00000000-0000-0000-0000-000000000e81', '00000000-0000-0000-0000-000000000008', private.hoy_ar() - 60, 'X', 'apto', 'anual', null, null, ok from r
+union all
+select '00000000-0000-0000-0000-000000000e82', '00000000-0000-0000-0000-000000000008', private.hoy_ar() - 2, 'X', 'apto', 'tarea_puntual', 'Corte de reja', private.hoy_ar() + 1, ok from r
+union all
+select '00000000-0000-0000-0000-000000000e91', '00000000-0000-0000-0000-000000000009', private.hoy_ar() - 400, 'X', 'apto', 'anual', null, null, ok from r
+union all
+select '00000000-0000-0000-0000-000000000e92', '00000000-0000-0000-0000-000000000009', private.hoy_ar() - 3, 'X', 'apto', 'tarea_puntual', 'Corte de reja', private.hoy_ar() + 2, ok from r
+union all
+select '00000000-0000-0000-0000-000000000ea1', '00000000-0000-0000-0000-000000000010', private.hoy_ar() - 400, 'X', 'apto', 'anual', null, null, ok from r
+union all
+select '00000000-0000-0000-0000-000000000ea2', '00000000-0000-0000-0000-000000000010', private.hoy_ar() - 1, 'X', 'no_apto', 'anual', null, null, ok from r;
+
+select is((select examen_id from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000007'),
+  '00000000-0000-0000-0000-000000000e71'::uuid, 'un No apto nuevo no tapa una habilitación vigente');
+select is((select estado from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000007'), 'vigente', '... y la persona sigue vigente');
+select is((select examen_id from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000008'),
+  '00000000-0000-0000-0000-000000000e81'::uuid, 'con anual y tarea puntual vigentes, el listado muestra la anual');
+select is((select estado from examenes_estado where id = '00000000-0000-0000-0000-000000000e81'), 'vigente', 'una tarea puntual no renueva (ni inhabilita) la anual');
+select is((select examen_id from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000009'),
+  '00000000-0000-0000-0000-000000000e92'::uuid, 'si solo la tarea puntual está en fecha, se muestra esa');
+select is((select estado from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000010'), 'no_apto',
+  'sin habilitación en fecha, se muestra el último examen');
+
+select is((select count(*)::int from habilitaciones_actuales), 10, 'una fila por persona');
 
 update configuracion set dias_aviso = '{7,0}';
 select is((select estado from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000002'), 'vigente', 'por_vencer usa el umbral configurado');
