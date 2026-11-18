@@ -7,6 +7,7 @@ import { Listado } from './pages/Listado'
 import { Login } from './pages/Login'
 import { NoEncontrado } from './pages/NoEncontrado'
 import { NuevaContrasena } from './pages/NuevaContrasena'
+import { NuevoExamen } from './pages/NuevoExamen'
 import { Proximamente } from './pages/Proximamente'
 import { RecuperarContrasena } from './pages/RecuperarContrasena'
 
@@ -30,7 +31,7 @@ export function App() {
           path="examenes/nuevo"
           element={
             <RequireAuth permitido={puedeCargarExamenes}>
-              <Proximamente titulo="Nuevo examen" etapa={4} />
+              <NuevoExamen />
             </RequireAuth>
           }
         />

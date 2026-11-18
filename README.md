@@ -4,8 +4,7 @@ Aplicación web para registrar los exámenes prácticos de uso de amoladoras ang
 generar el PDF de la planilla y controlar qué operarios están habilitados, por vencer o
 vencidos. La spec completa está en [`docs/SPEC.md`](docs/SPEC.md).
 
-> Estado: **etapa 3 (listado)**. El examen con PDF, los avisos por mail y
-> la administración llegan en las etapas siguientes; este README se completa en cada una.
+> Estado: **etapa 4 (nuevo examen y PDF)**. Los avisos por mail y la administración llegan en las etapas siguientes; este README se completa en cada una.
 
 Stack: React + Vite + TypeScript + Tailwind CSS, Supabase (Auth, Postgres, Storage) y
 Cloudflare Pages.
@@ -90,6 +89,19 @@ npm run dev                  # http://localhost:5173
 | `npm run build` | Chequeo de tipos y build de producción en `dist/` |
 | `npm test` | Tests del frontend (Vitest) |
 | `npm run test:db` | Tests de la base (pgTAP) en un Postgres local, ver abajo |
+
+## Checklist del examen
+
+Los puntos del examen están en [`src/config/checklist.json`](src/config/checklist.json).
+Se pueden cambiar los textos, agregar o quitar puntos y secciones sin tocar el código
+(después hay que volver a publicar la app). Reglas:
+
+- Cada punto tiene un `id` único. No conviene cambiar el `id` de un punto que ya se usó.
+- Si cambiás la lista, subí el número de `version`.
+- Los exámenes ya cargados guardan su propia copia de la checklist, así que no cambian.
+
+Al guardar un examen, la app genera el PDF A4 en el navegador, lo sube al bucket privado
+`examenes-pdf` (ruta `<persona>/<examen>.pdf`) y después registra el examen.
 
 ## Base de datos
 
