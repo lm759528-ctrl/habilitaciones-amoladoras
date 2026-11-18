@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { esAdmin, puedeCargarExamenes } from './auth/permisos'
 import { Layout } from './components/Layout'
+import { DetallePersona } from './pages/DetallePersona'
+import { Listado } from './pages/Listado'
 import { Login } from './pages/Login'
 import { NoEncontrado } from './pages/NoEncontrado'
 import { NuevaContrasena } from './pages/NuevaContrasena'
@@ -22,7 +24,8 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Proximamente titulo="Habilitados" etapa={3} />} />
+        <Route index element={<Listado />} />
+        <Route path="personas/:id" element={<DetallePersona />} />
         <Route
           path="examenes/nuevo"
           element={
