@@ -1,13 +1,13 @@
 -- Tests de reglas de negocio: vencimientos, estados, anulación y validaciones.
 begin;
 create extension if not exists pgtap with schema extensions;
-set search_path = public, extensions;
+set search_path = habilitaciones, extensions;
 
 select plan(41);
 
 insert into auth.users (id, email, raw_app_meta_data) values
-  ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local', '{"rol":"admin"}'),
-  ('00000000-0000-0000-0000-0000000000a2', 'admin2@test.local', '{"rol":"admin"}');
+  ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local', '{"habilitaciones_rol":"admin"}'),
+  ('00000000-0000-0000-0000-0000000000a2', 'admin2@test.local', '{"habilitaciones_rol":"admin"}');
 
 insert into empresas (id, nombre) values
   ('00000000-0000-0000-0000-0000000000e1', 'Contratista Uno'),
@@ -64,7 +64,7 @@ select throws_ok($$insert into examenes (persona_id, fecha_examen, controlo, res
   select '00000000-0000-0000-0000-000000000001', '2026-03-10', 'X', 'no_apto', 'anual', '2027-03-10', ok from r$$,
   '23514', null, 'un "No apto" no genera habilitación');
 
-select is(private.calcular_vencimiento('anual', '2028-02-29'), '2029-02-28'::date, 'anual desde 29/02 vence el 28/02');
+select is(habilitaciones_priv.calcular_vencimiento('anual', '2028-02-29'), '2029-02-28'::date, 'anual desde 29/02 vence el 28/02');
 
 -- ---------------------------------------------------------------------------
 -- Validaciones
@@ -91,28 +91,28 @@ select throws_ok($$insert into empresas (nombre) values ('  contratista uno ')$$
 -- Estados
 -- ---------------------------------------------------------------------------
 insert into examenes (persona_id, fecha_examen, fecha_inicio, fecha_vencimiento, controlo, resultado, tipo_habilitacion, respuestas)
-select '00000000-0000-0000-0000-000000000002'::uuid, private.hoy_ar() - 300, private.hoy_ar() - 300, private.hoy_ar() + 30, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, ok from r
+select '00000000-0000-0000-0000-000000000002'::uuid, habilitaciones_priv.hoy_ar() - 300, habilitaciones_priv.hoy_ar() - 300, habilitaciones_priv.hoy_ar() + 30, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, ok from r
 union all
-select '00000000-0000-0000-0000-000000000003', private.hoy_ar() - 400, private.hoy_ar() - 400, private.hoy_ar() - 1, 'X', 'apto', 'anual', ok from r;
+select '00000000-0000-0000-0000-000000000003', habilitaciones_priv.hoy_ar() - 400, habilitaciones_priv.hoy_ar() - 400, habilitaciones_priv.hoy_ar() - 1, 'X', 'apto', 'anual', ok from r;
 
 insert into examenes (persona_id, fecha_examen, controlo, resultado, tipo_habilitacion, respuestas)
-select '00000000-0000-0000-0000-000000000004', private.hoy_ar(), 'X', 'no_apto', 'anual', ok from r;
+select '00000000-0000-0000-0000-000000000004', habilitaciones_priv.hoy_ar(), 'X', 'no_apto', 'anual', ok from r;
 
 -- Renovado: un apto viejo y uno nuevo.
 insert into examenes (id, persona_id, fecha_examen, controlo, resultado, tipo_habilitacion, respuestas)
-select '00000000-0000-0000-0000-0000000000d1'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, private.hoy_ar() - 200, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, ok from r
+select '00000000-0000-0000-0000-0000000000d1'::uuid, '00000000-0000-0000-0000-000000000005'::uuid, habilitaciones_priv.hoy_ar() - 200, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, ok from r
 union all
-select '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-000000000005', private.hoy_ar() - 5, 'X', 'apto', 'anual', ok from r;
+select '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-000000000005', habilitaciones_priv.hoy_ar() - 5, 'X', 'apto', 'anual', ok from r;
 
 -- Anulado: un apto viejo vigente y uno nuevo que se anula.
 insert into examenes (id, persona_id, fecha_examen, controlo, resultado, tipo_habilitacion, respuestas)
-select '00000000-0000-0000-0000-0000000000a5'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, private.hoy_ar() - 100, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, ok from r
+select '00000000-0000-0000-0000-0000000000a5'::uuid, '00000000-0000-0000-0000-000000000006'::uuid, habilitaciones_priv.hoy_ar() - 100, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, ok from r
 union all
-select '00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-000000000006', private.hoy_ar() - 1, 'X', 'apto', 'anual', ok from r;
+select '00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-000000000006', habilitaciones_priv.hoy_ar() - 1, 'X', 'apto', 'anual', ok from r;
 
 -- Persona 1: el examen más reciente (2026-08-31, semestral) define su estado.
 -- Se mueven a fechas relativas a hoy para que el test no dependa del día.
-update examenes set fecha_examen = private.hoy_ar() - 10, fecha_inicio = private.hoy_ar() - 10, fecha_vencimiento = private.hoy_ar() + 170
+update examenes set fecha_examen = habilitaciones_priv.hoy_ar() - 10, fecha_inicio = habilitaciones_priv.hoy_ar() - 10, fecha_vencimiento = habilitaciones_priv.hoy_ar() + 170
 where id = '00000000-0000-0000-0000-0000000000f2';
 
 select is((select estado from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000001'), 'vigente', 'estado vigente');
@@ -126,21 +126,21 @@ select is((select examen_id from habilitaciones_actuales where persona_id = '000
 select is((select estado from examenes_estado where id = '00000000-0000-0000-0000-0000000000d1'), 'renovado', 'el examen viejo figura como renovado');
 -- Un examen nuevo no inhabilita una habilitación vigente.
 insert into examenes (id, persona_id, fecha_examen, controlo, resultado, tipo_habilitacion, descripcion_tarea, fecha_vencimiento, respuestas)
-select '00000000-0000-0000-0000-000000000e71'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, private.hoy_ar() - 30, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, null, null::date, ok from r
+select '00000000-0000-0000-0000-000000000e71'::uuid, '00000000-0000-0000-0000-000000000007'::uuid, habilitaciones_priv.hoy_ar() - 30, 'X', 'apto'::resultado_examen, 'anual'::tipo_habilitacion, null, null::date, ok from r
 union all
-select '00000000-0000-0000-0000-000000000e72', '00000000-0000-0000-0000-000000000007', private.hoy_ar() - 1, 'X', 'no_apto', 'anual', null, null, ok from r
+select '00000000-0000-0000-0000-000000000e72', '00000000-0000-0000-0000-000000000007', habilitaciones_priv.hoy_ar() - 1, 'X', 'no_apto', 'anual', null, null, ok from r
 union all
-select '00000000-0000-0000-0000-000000000e81', '00000000-0000-0000-0000-000000000008', private.hoy_ar() - 60, 'X', 'apto', 'anual', null, null, ok from r
+select '00000000-0000-0000-0000-000000000e81', '00000000-0000-0000-0000-000000000008', habilitaciones_priv.hoy_ar() - 60, 'X', 'apto', 'anual', null, null, ok from r
 union all
-select '00000000-0000-0000-0000-000000000e82', '00000000-0000-0000-0000-000000000008', private.hoy_ar() - 2, 'X', 'apto', 'tarea_puntual', 'Corte de reja', private.hoy_ar() + 1, ok from r
+select '00000000-0000-0000-0000-000000000e82', '00000000-0000-0000-0000-000000000008', habilitaciones_priv.hoy_ar() - 2, 'X', 'apto', 'tarea_puntual', 'Corte de reja', habilitaciones_priv.hoy_ar() + 1, ok from r
 union all
-select '00000000-0000-0000-0000-000000000e91', '00000000-0000-0000-0000-000000000009', private.hoy_ar() - 400, 'X', 'apto', 'anual', null, null, ok from r
+select '00000000-0000-0000-0000-000000000e91', '00000000-0000-0000-0000-000000000009', habilitaciones_priv.hoy_ar() - 400, 'X', 'apto', 'anual', null, null, ok from r
 union all
-select '00000000-0000-0000-0000-000000000e92', '00000000-0000-0000-0000-000000000009', private.hoy_ar() - 3, 'X', 'apto', 'tarea_puntual', 'Corte de reja', private.hoy_ar() + 2, ok from r
+select '00000000-0000-0000-0000-000000000e92', '00000000-0000-0000-0000-000000000009', habilitaciones_priv.hoy_ar() - 3, 'X', 'apto', 'tarea_puntual', 'Corte de reja', habilitaciones_priv.hoy_ar() + 2, ok from r
 union all
-select '00000000-0000-0000-0000-000000000ea1', '00000000-0000-0000-0000-000000000010', private.hoy_ar() - 400, 'X', 'apto', 'anual', null, null, ok from r
+select '00000000-0000-0000-0000-000000000ea1', '00000000-0000-0000-0000-000000000010', habilitaciones_priv.hoy_ar() - 400, 'X', 'apto', 'anual', null, null, ok from r
 union all
-select '00000000-0000-0000-0000-000000000ea2', '00000000-0000-0000-0000-000000000010', private.hoy_ar() - 1, 'X', 'no_apto', 'anual', null, null, ok from r;
+select '00000000-0000-0000-0000-000000000ea2', '00000000-0000-0000-0000-000000000010', habilitaciones_priv.hoy_ar() - 1, 'X', 'no_apto', 'anual', null, null, ok from r;
 
 select is((select examen_id from habilitaciones_actuales where persona_id = '00000000-0000-0000-0000-000000000007'),
   '00000000-0000-0000-0000-000000000e71'::uuid, 'un No apto nuevo no tapa una habilitación vigente');

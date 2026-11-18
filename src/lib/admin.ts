@@ -67,10 +67,14 @@ export async function actualizarUsuario(id: string, cambios: Partial<Pick<Usuari
   if (error) throw error
 }
 
-/** Invita por email (Edge Function invitar-usuario, que usa la service role key). */
-export async function invitarUsuario(datos: { email: string; nombre: string; rol: Rol }): Promise<void> {
-  const { error } = await supabase.functions.invoke('invitar-usuario', { body: datos })
-  if (!error) return
+/**
+ * Invita por email (Edge Function invitar-usuario, que usa la service role key).
+ * Devuelve `existente: true` si el email ya tenía cuenta en el proyecto de
+ * Supabase (por ejemplo, de otra app): no se manda mail y entra con su contraseña.
+ */
+export async function invitarUsuario(datos: { email: string; nombre: string; rol: Rol }): Promise<{ existente: boolean }> {
+  const { data, error } = await supabase.functions.invoke('invitar-usuario', { body: datos })
+  if (!error) return { existente: Boolean(data?.existente) }
   // FunctionsHttpError trae la respuesta de la función con el motivo.
   const respuesta = (error as { context?: Response }).context
   const cuerpo = respuesta ? await respuesta.json().catch(() => null) : null

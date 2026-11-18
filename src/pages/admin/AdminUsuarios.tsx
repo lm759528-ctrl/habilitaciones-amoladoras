@@ -18,13 +18,13 @@ export function AdminUsuarios() {
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
   const [ocupado, setOcupado] = useState(false)
 
-  async function ejecutar(accion: () => Promise<void>, ok: string) {
+  async function ejecutar(accion: () => Promise<string | void>, ok: string) {
     setMensaje(null)
     setOcupado(true)
     try {
-      await accion()
+      const texto = await accion()
       usuarios.recargar()
-      setMensaje({ tipo: 'ok', texto: ok })
+      setMensaje({ tipo: 'ok', texto: texto || ok })
       return true
     } catch (e) {
       setMensaje({ tipo: 'error', texto: mensajeErrorAdmin(e) })
@@ -37,7 +37,12 @@ export function AdminUsuarios() {
   async function invitar(e: FormEvent) {
     e.preventDefault()
     const listo = await ejecutar(
-      () => invitarUsuario(invitacion),
+      async () => {
+        const { existente } = await invitarUsuario(invitacion)
+        if (existente) {
+          return `${invitacion.email} ya tenía cuenta (por ejemplo, de otra app de la empresa): ahora tiene acceso y entra con su misma contraseña. Si no la recuerda, que use "Olvidé mi contraseña".`
+        }
+      },
       `Se mandó la invitación a ${invitacion.email}. Va a recibir un link para elegir su contraseña.`,
     )
     if (listo) setInvitacion({ email: '', nombre: '', rol: 'seguridad' })

@@ -34,6 +34,7 @@ function pedirContrasena(pregunta) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
+  db: { schema: 'habilitaciones' },
 })
 
 async function buscarUsuario(email) {
@@ -45,7 +46,8 @@ async function buscarUsuario(email) {
   }
 }
 
-const appMetadata = { rol: 'admin', nombre }
+// Claves con prefijo: el proyecto de Supabase puede tener usuarios de otras apps.
+const appMetadata = { habilitaciones_rol: 'admin', habilitaciones_nombre: nombre }
 let usuario = await buscarUsuario(email)
 
 if (usuario) {

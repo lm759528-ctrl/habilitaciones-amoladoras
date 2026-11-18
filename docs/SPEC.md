@@ -31,6 +31,14 @@ Seguridad e Higiene. La app maneja datos personales (DNI): nada se lee sin login
 | 5 | Avisos por mail | Edge Function + pg_cron 8:00 AR, umbrales configurables, Resend o SMTP Gmail. |
 | 6 | Administración | ABM empresas, personas y usuarios (invitar y asignar rol), anular exámenes. |
 
+## Proyecto de Supabase compartido
+
+Lucas usa un proyecto de Supabase que ya tiene otra app de la empresa (plan gratis). Por eso
+todo va en esquemas propios (`habilitaciones` expuesto por la API, `habilitaciones_priv` para
+funciones internas), con nombres prefijados en bucket, cron, Vault, trigger de `auth.users` y
+`app_metadata` (`habilitaciones_rol`, `habilitaciones_nombre`). La configuración global de Auth
+(registro público, Site URL, largo de contraseña) no se toca si la otra app la necesita.
+
 ## Modelo de datos (etapa 1)
 
 | Tabla / vista | Para qué |
@@ -113,7 +121,7 @@ Cada `respuesta` tiene que ser `si`, `no` o `na`.
 - El rol `evaluador` existe en el enum. Para activarlo alcanza con cambiar
   `private.puede_cargar_examenes()`.
 - No se puede desactivar ni degradar al último admin activo.
-- Bucket `examenes-pdf` privado, solo PDFs de hasta 5 MB; se abren con URLs firmadas.
+- Bucket `habilitaciones-examenes` privado, solo PDFs de hasta 5 MB; se abren con URLs firmadas.
 
 ## Comandos
 

@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
   const comoUsuario = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: authorization } },
     auth: { persistSession: false },
+    db: { schema: 'habilitaciones' },
   })
   const { data: quien } = await comoUsuario.auth.getUser()
   if (!quien.user) return json(401, { error: 'Tenés que ingresar de nuevo.' })
@@ -37,29 +38,53 @@ Deno.serve(async (req) => {
   const { email, nombre, rol } = validacion.pedido
 
   // 3. Invitar con la service role key.
-  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
-  const appUrl = (Deno.env.get('APP_URL') ?? '').replace(/\/+$/, '')
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { nombre },
-    redirectTo: appUrl ? `${appUrl}/nueva-contrasena` : undefined,
+  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false },
+    db: { schema: 'habilitaciones' },
   })
-  if (error) {
-    if (error.code === 'email_exists' || /already been registered/i.test(error.message)) {
-      return json(409, { error: 'Ya existe un usuario con ese email. Cambiale el rol desde la lista.' })
+  const appUrl = (Deno.env.get('APP_URL') ?? '').replace(/\/+$/, '')
+
+  // El proyecto de Supabase puede tener usuarios de otra app: si el email ya
+  // tiene cuenta, no se manda invitación y se le da acceso con su contraseña.
+  const existente = await buscarUsuario(admin, email)
+  let id: string
+  if (existente) {
+    id = existente.id
+  } else {
+    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+      data: { nombre },
+      redirectTo: appUrl ? `${appUrl}/nueva-contrasena` : undefined,
+    })
+    if (error) {
+      console.error(JSON.stringify({ evento: 'invitacion_error', error: error.message }))
+      return json(502, { error: 'No se pudo enviar la invitación. Revisá la configuración de mail de Supabase Auth.' })
     }
-    console.error(JSON.stringify({ evento: 'invitacion_error', error: error.message }))
-    return json(502, { error: 'No se pudo enviar la invitación. Revisá la configuración de mail de Supabase Auth.' })
+    id = data.user.id
   }
 
   // 4. Rol: en app_metadata (solo lo escribe la service role) y en profiles.
-  const id = data.user.id
-  const r1 = await admin.auth.admin.updateUserById(id, { app_metadata: { rol, nombre } })
+  // Claves con prefijo para no pisar las de otras apps del mismo proyecto.
+  const r1 = await admin.auth.admin.updateUserById(id, {
+    app_metadata: { ...existente?.app_metadata, habilitaciones_rol: rol, habilitaciones_nombre: nombre },
+  })
   const r2 = await admin.from('profiles').upsert({ id, email, nombre, rol, activo: true })
   if (r1.error || r2.error) {
     console.error(JSON.stringify({ evento: 'invitacion_rol_error', error: (r1.error ?? r2.error)?.message }))
     return json(500, { error: 'Se mandó la invitación pero no se pudo asignar el rol. Asignalo desde la lista.' })
   }
 
-  console.log(JSON.stringify({ evento: 'usuario_invitado', rol, por: quien.user.id }))
-  return json(200, { id })
+  console.log(JSON.stringify({ evento: existente ? 'acceso_agregado' : 'usuario_invitado', rol, por: quien.user.id }))
+  return json(200, { id, existente: Boolean(existente) })
 })
+
+// Solo usa auth.admin, así que alcanza con el tipo de ese pedazo del cliente.
+type ClienteAdmin = { auth: { admin: Pick<ReturnType<typeof createClient>["auth"]["admin"], "listUsers"> } }
+
+async function buscarUsuario(admin: ClienteAdmin, email: string) {
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw error
+    const u = data.users.find((x) => x.email?.toLowerCase() === email.toLowerCase())
+    if (u || data.users.length < 200) return u ?? null
+  }
+}

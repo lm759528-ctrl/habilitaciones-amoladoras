@@ -1,26 +1,32 @@
 -- Etapa 1: esquema base (tipos, tablas, restricciones y triggers de negocio).
 -- Las políticas RLS están en 20261118000300_rls.sql.
 
-create schema if not exists private;
-comment on schema private is 'Funciones internas (no expuestas por la API REST).';
-revoke all on schema private from public;
-grant usage on schema private to authenticated, service_role;
+-- Todo vive en esquemas propios para poder compartir el proyecto de Supabase con
+-- otras apps sin chocar con sus tablas de public.
+create schema if not exists habilitaciones;
+comment on schema habilitaciones is 'App de habilitaciones de amoladoras (expuesto por la API REST).';
+grant usage on schema habilitaciones to authenticated, service_role;
+
+create schema if not exists habilitaciones_priv;
+comment on schema habilitaciones_priv is 'Funciones internas (no expuestas por la API REST).';
+revoke all on schema habilitaciones_priv from public;
+grant usage on schema habilitaciones_priv to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- Tipos
 -- ---------------------------------------------------------------------------
 
 -- 'evaluador' queda preparado: hoy ninguna política le da permisos.
-create type public.rol_usuario as enum ('admin', 'seguridad', 'evaluador');
-create type public.resultado_examen as enum ('apto', 'no_apto');
-create type public.tipo_habilitacion as enum ('anual', 'semestral', 'tarea_puntual');
+create type habilitaciones.rol_usuario as enum ('admin', 'seguridad', 'evaluador');
+create type habilitaciones.resultado_examen as enum ('apto', 'no_apto');
+create type habilitaciones.tipo_habilitacion as enum ('anual', 'semestral', 'tarea_puntual');
 
 -- ---------------------------------------------------------------------------
 -- Utilidades
 -- ---------------------------------------------------------------------------
 
 -- Fecha de hoy en Argentina (no la del servidor, que corre en UTC).
-create function private.hoy_ar()
+create function habilitaciones_priv.hoy_ar()
 returns date
 language sql
 stable
@@ -29,7 +35,7 @@ as $$
   select (now() at time zone 'America/Argentina/Buenos_Aires')::date
 $$;
 
-create function private.set_updated_at()
+create function habilitaciones_priv.set_updated_at()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -44,43 +50,43 @@ $$;
 -- profiles
 -- ---------------------------------------------------------------------------
 
-create table public.profiles (
+create table habilitaciones.profiles (
   id         uuid primary key references auth.users (id) on delete cascade,
   nombre     text not null default '',
   email      text,
-  rol        public.rol_usuario not null,
+  rol        habilitaciones.rol_usuario not null,
   activo     boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-comment on table public.profiles is 'Perfil y rol de cada usuario de la app. El rol se lee solo de acá.';
+comment on table habilitaciones.profiles is 'Perfil y rol de cada usuario de la app. El rol se lee solo de acá.';
 
 create trigger profiles_updated_at
-  before update on public.profiles
-  for each row execute function private.set_updated_at();
+  before update on habilitaciones.profiles
+  for each row execute function habilitaciones_priv.set_updated_at();
 
 -- Crea el perfil al crear el usuario en Auth, pero solo si el rol viene en
 -- app_metadata (que solo puede escribir el service_role). Un usuario creado
 -- por cualquier otra vía queda sin perfil y, por lo tanto, sin acceso.
-create function private.crear_profile_desde_auth()
+create function habilitaciones_priv.crear_profile_desde_auth()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_rol text := new.raw_app_meta_data ->> 'rol';
+  v_rol text := new.raw_app_meta_data ->> 'habilitaciones_rol';
 begin
   if v_rol is null or v_rol not in ('admin', 'seguridad', 'evaluador') then
     return new;
   end if;
 
-  insert into public.profiles (id, nombre, email, rol)
+  insert into habilitaciones.profiles (id, nombre, email, rol)
   values (
     new.id,
-    coalesce(new.raw_app_meta_data ->> 'nombre', new.raw_user_meta_data ->> 'nombre', ''),
+    coalesce(new.raw_app_meta_data ->> 'habilitaciones_nombre', new.raw_user_meta_data ->> 'nombre', ''),
     new.email,
-    v_rol::public.rol_usuario
+    v_rol::habilitaciones.rol_usuario
   )
   on conflict (id) do nothing;
 
@@ -88,12 +94,12 @@ begin
 end;
 $$;
 
-create trigger on_auth_user_created
+create trigger habilitaciones_crear_profile
   after insert on auth.users
-  for each row execute function private.crear_profile_desde_auth();
+  for each row execute function habilitaciones_priv.crear_profile_desde_auth();
 
 -- Nunca dejar la app sin un admin activo.
-create function private.proteger_ultimo_admin()
+create function habilitaciones_priv.proteger_ultimo_admin()
 returns trigger
 language plpgsql
 security definer
@@ -103,7 +109,7 @@ begin
   if old.rol = 'admin' and old.activo
      and (tg_op = 'DELETE' or new.rol <> 'admin' or not new.activo)
      and not exists (
-       select 1 from public.profiles p
+       select 1 from habilitaciones.profiles p
        where p.rol = 'admin' and p.activo and p.id <> old.id
      )
   then
@@ -116,46 +122,46 @@ end;
 $$;
 
 create trigger profiles_proteger_ultimo_admin
-  before update or delete on public.profiles
-  for each row execute function private.proteger_ultimo_admin();
+  before update or delete on habilitaciones.profiles
+  for each row execute function habilitaciones_priv.proteger_ultimo_admin();
 
 -- ---------------------------------------------------------------------------
 -- empresas
 -- ---------------------------------------------------------------------------
 
-create table public.empresas (
+create table habilitaciones.empresas (
   id         uuid primary key default gen_random_uuid(),
   nombre     text not null check (btrim(nombre) <> ''),
   activo     boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create unique index empresas_nombre_unico on public.empresas (lower(btrim(nombre)));
+create unique index empresas_nombre_unico on habilitaciones.empresas (lower(btrim(nombre)));
 
 create trigger empresas_updated_at
-  before update on public.empresas
-  for each row execute function private.set_updated_at();
+  before update on habilitaciones.empresas
+  for each row execute function habilitaciones_priv.set_updated_at();
 
 -- ---------------------------------------------------------------------------
 -- personas
 -- ---------------------------------------------------------------------------
 
-create table public.personas (
+create table habilitaciones.personas (
   id         uuid primary key default gen_random_uuid(),
   nombre     text not null check (btrim(nombre) <> ''),
   apellido   text not null check (btrim(apellido) <> ''),
   -- DNI argentino: 7 u 8 dígitos, sin puntos ni espacios.
   dni        text not null unique check (dni ~ '^[0-9]{7,8}$'),
-  empresa_id uuid not null references public.empresas (id) on delete restrict,
+  empresa_id uuid not null references habilitaciones.empresas (id) on delete restrict,
   activo     boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index personas_empresa_id on public.personas (empresa_id);
+create index personas_empresa_id on habilitaciones.personas (empresa_id);
 
 create trigger personas_updated_at
-  before update on public.personas
-  for each row execute function private.set_updated_at();
+  before update on habilitaciones.personas
+  for each row execute function habilitaciones_priv.set_updated_at();
 
 -- ---------------------------------------------------------------------------
 -- examenes
@@ -164,7 +170,7 @@ create trigger personas_updated_at
 -- La checklist tiene que tener secciones con ítems, y cada ítem una
 -- respuesta 'si', 'no' o 'na'. Los textos se guardan con el examen para que
 -- el historial no dependa de cambios futuros en la configuración.
-create function private.respuestas_validas(r jsonb)
+create function habilitaciones_priv.respuestas_validas(r jsonb)
 returns boolean
 language sql
 immutable
@@ -182,15 +188,15 @@ as $$
      false)  -- un check que da NULL pasaría: lo que no se puede evaluar es inválido
 $$;
 
-create table public.examenes (
+create table habilitaciones.examenes (
   id                 uuid primary key default gen_random_uuid(),
-  persona_id         uuid not null references public.personas (id) on delete restrict,
+  persona_id         uuid not null references habilitaciones.personas (id) on delete restrict,
   -- Empresa del operario al momento del examen (puede cambiar después).
-  empresa_id         uuid not null references public.empresas (id) on delete restrict,
+  empresa_id         uuid not null references habilitaciones.empresas (id) on delete restrict,
   fecha_examen       date not null,
   controlo           text not null check (btrim(controlo) <> ''),
-  resultado          public.resultado_examen not null,
-  tipo_habilitacion  public.tipo_habilitacion not null,
+  resultado          habilitaciones.resultado_examen not null,
+  tipo_habilitacion  habilitaciones.tipo_habilitacion not null,
   descripcion_tarea  text,
   fecha_inicio       date,
   fecha_vencimiento  date,
@@ -218,20 +224,20 @@ create table public.examenes (
   constraint examenes_anulado_con_motivo check (
     not anulado or btrim(coalesce(motivo_anulacion, '')) <> ''
   ),
-  constraint examenes_respuestas_validas check (private.respuestas_validas(respuestas))
+  constraint examenes_respuestas_validas check (habilitaciones_priv.respuestas_validas(respuestas))
 );
-comment on table public.examenes is 'Exámenes prácticos. No se borran: se anulan con motivo.';
+comment on table habilitaciones.examenes is 'Exámenes prácticos. No se borran: se anulan con motivo.';
 
-create index examenes_persona_reciente on public.examenes (persona_id, fecha_examen desc, created_at desc);
-create index examenes_vencimiento on public.examenes (fecha_vencimiento) where not anulado and resultado = 'apto';
+create index examenes_persona_reciente on habilitaciones.examenes (persona_id, fecha_examen desc, created_at desc);
+create index examenes_vencimiento on habilitaciones.examenes (fecha_vencimiento) where not anulado and resultado = 'apto';
 
 create trigger examenes_updated_at
-  before update on public.examenes
-  for each row execute function private.set_updated_at();
+  before update on habilitaciones.examenes
+  for each row execute function habilitaciones_priv.set_updated_at();
 
 -- Vencimiento automático: anual = 12 meses, semestral = 6 meses desde el inicio.
 -- Si el admin manda una fecha de vencimiento, se respeta.
-create function private.calcular_vencimiento(p_tipo public.tipo_habilitacion, p_inicio date)
+create function habilitaciones_priv.calcular_vencimiento(p_tipo habilitaciones.tipo_habilitacion, p_inicio date)
 returns date
 language sql
 immutable
@@ -244,7 +250,7 @@ as $$
   end
 $$;
 
-create function private.examenes_completar()
+create function habilitaciones_priv.examenes_completar()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -252,7 +258,7 @@ as $$
 begin
   if tg_op = 'INSERT' and new.empresa_id is null then
     select p.empresa_id into new.empresa_id
-    from public.personas p
+    from habilitaciones.personas p
     where p.id = new.persona_id;
   end if;
 
@@ -263,7 +269,7 @@ begin
         raise exception 'Para una tarea puntual hay que indicar la fecha de fin'
           using errcode = '23514';
       end if;
-      new.fecha_vencimiento := private.calcular_vencimiento(new.tipo_habilitacion, new.fecha_inicio);
+      new.fecha_vencimiento := habilitaciones_priv.calcular_vencimiento(new.tipo_habilitacion, new.fecha_inicio);
     end if;
   end if;
 
@@ -272,12 +278,12 @@ end;
 $$;
 
 create trigger examenes_completar
-  before insert or update on public.examenes
-  for each row execute function private.examenes_completar();
+  before insert or update on habilitaciones.examenes
+  for each row execute function habilitaciones_priv.examenes_completar();
 
 -- Reglas de edición: no se borra, la autoría no cambia y un examen anulado
 -- queda congelado (no se puede "desanular" ni editar).
-create function private.examenes_proteger()
+create function habilitaciones_priv.examenes_proteger()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -312,36 +318,36 @@ end;
 $$;
 
 create trigger examenes_proteger
-  before update or delete on public.examenes
-  for each row execute function private.examenes_proteger();
+  before update or delete on habilitaciones.examenes
+  for each row execute function habilitaciones_priv.examenes_proteger();
 
 -- ---------------------------------------------------------------------------
 -- avisos_enviados
 -- ---------------------------------------------------------------------------
 
-create table public.avisos_enviados (
-  examen_id   uuid not null references public.examenes (id) on delete restrict,
+create table habilitaciones.avisos_enviados (
+  examen_id   uuid not null references habilitaciones.examenes (id) on delete restrict,
   umbral_dias integer not null check (umbral_dias >= 0),
   enviado_at  timestamptz not null default now(),
   primary key (examen_id, umbral_dias)
 );
-comment on table public.avisos_enviados is 'Avisos de vencimiento ya enviados (los escribe la Edge Function).';
+comment on table habilitaciones.avisos_enviados is 'Avisos de vencimiento ya enviados (los escribe la Edge Function).';
 
 -- ---------------------------------------------------------------------------
 -- configuracion (fila única)
 -- ---------------------------------------------------------------------------
 
-create table public.configuracion (
+create table habilitaciones.configuracion (
   id         boolean primary key default true check (id),
   -- Días antes del vencimiento en que se avisa. 0 = el día del vencimiento.
   dias_aviso integer[] not null default '{30,7,0}'
     check (cardinality(dias_aviso) > 0 and 0 <= all (dias_aviso) and array_position(dias_aviso, null) is null),
   updated_at timestamptz not null default now()
 );
-comment on table public.configuracion is 'Parámetros de la app editables por el admin (una sola fila).';
+comment on table habilitaciones.configuracion is 'Parámetros de la app editables por el admin (una sola fila).';
 
-insert into public.configuracion (id) values (true);
+insert into habilitaciones.configuracion (id) values (true);
 
 create trigger configuracion_updated_at
-  before update on public.configuracion
-  for each row execute function private.set_updated_at();
+  before update on habilitaciones.configuracion
+  for each row execute function habilitaciones_priv.set_updated_at();

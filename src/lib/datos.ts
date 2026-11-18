@@ -2,7 +2,7 @@
 import { supabase } from './supabase'
 import type { ExamenConEstado, Habilitacion } from './habilitaciones'
 
-export const BUCKET_PDF = 'examenes-pdf'
+export const BUCKET_PDF = 'habilitaciones-examenes'
 /** Los links a los PDFs vencen a los 5 minutos. */
 const SEGUNDOS_LINK_PDF = 300
 
