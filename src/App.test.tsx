@@ -7,6 +7,7 @@ import { perfil, renderConAuth, sesion } from './test/renderConAuth'
 vi.mock('./lib/datos', () => ({
   obtenerHabilitaciones: async () => [],
   obtenerEmpresas: async () => [],
+  obtenerPersonas: async () => [],
 }))
 
 describe('rutas y roles', () => {

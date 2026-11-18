@@ -4,7 +4,7 @@ Aplicación web para registrar los exámenes prácticos de uso de amoladoras ang
 generar el PDF de la planilla y controlar qué operarios están habilitados, por vencer o
 vencidos. La spec completa está en [`docs/SPEC.md`](docs/SPEC.md).
 
-> Estado: **etapa 5 (avisos por mail)**. La administración llega en la etapa 6.
+> Estado: **completo (etapas 1 a 6)**.
 
 Stack: React + Vite + TypeScript + Tailwind CSS, Supabase (Auth, Postgres, Storage) y
 Cloudflare Pages.
@@ -49,8 +49,8 @@ en el **SQL Editor**, cambiando el email y el nombre.
 > La `service_role` key saltea todos los permisos. Usala solo en tu PC: nunca la pongas en
 > variables `VITE_*` ni en Cloudflare.
 
-Los demás usuarios (Seguridad e Higiene) se invitan desde la pantalla de Administración
-(etapa 6). Hasta entonces se pueden crear con la opción B, cambiando `'admin'` por `'seguridad'` en el SQL.
+Los demás usuarios se invitan desde la pantalla de **Administración** (ver sección 5).
+También se pueden crear con la opción B, cambiando `'admin'` por `'seguridad'` en el SQL.
 
 ## 3. Publicar en Cloudflare Pages
 
@@ -125,6 +125,41 @@ curl -X POST "https://<ref>.supabase.co/functions/v1/avisos-vencimiento" -H "x-c
 
 Para ver las ejecuciones del cron: `select * from cron.job_run_details order by start_time desc limit 10;`.
 Los errores de la función aparecen en **Edge Functions → avisos-vencimiento → Logs**.
+
+## 5. Administración
+
+La pantalla **Administración** (solo admin) tiene tres solapas:
+
+- **Personas**: alta, edición (nombre, apellido, DNI, empresa) y baja/reactivación. Una persona
+  dada de baja no aparece en el listado ni recibe avisos, pero conserva su historial.
+- **Empresas**: alta, cambio de nombre y baja/reactivación. Las empresas dadas de baja no se
+  ofrecen al cargar exámenes nuevos; los exámenes viejos mantienen su empresa.
+- **Usuarios**: invitar por mail (rol Administrador o Seguridad e Higiene), cambiar el rol y
+  dar de baja/reactivar. Un usuario dado de baja no ve nada aunque tenga contraseña. La base
+  no deja quitar ni dar de baja al último administrador activo.
+
+En el detalle de una persona, el admin puede **anular** un examen indicando el motivo. El examen
+no se borra: queda en el historial marcado como anulado y deja de contar como habilitación.
+
+### Configurar las invitaciones
+
+Las invitaciones las manda Supabase Auth con la Edge Function `invitar-usuario`:
+
+1. Subí la función (usa el mismo `APP_URL` de `supabase/functions/.env`):
+
+   ```bash
+   npx supabase secrets set --env-file supabase/functions/.env
+   npx supabase functions deploy invitar-usuario
+   ```
+
+2. El servidor de mail que trae Supabase de fábrica manda muy pocos mails por hora y solo a
+   miembros del equipo del proyecto. Para invitar a cualquier dirección configurá un SMTP propio
+   en **Authentication → Emails → SMTP Settings** (sirven Resend, con host `smtp.resend.com`,
+   puerto 465, usuario `resend` y la API key como contraseña, o Gmail con contraseña de aplicación).
+3. Revisá que `https://<tu-app>/nueva-contrasena` esté en las **Redirect URLs** (sección 1).
+   El link de la invitación lleva ahí para que la persona elija su contraseña.
+4. Opcional: en **Authentication → Emails → Templates → Invite user** podés traducir el mail
+   al español.
 
 ## Desarrollo local
 

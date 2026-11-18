@@ -7,9 +7,10 @@ interface Props {
   cancelar: string
   onConfirmar: () => void
   onCancelar: () => void
+  confirmarDeshabilitado?: boolean
 }
 
-export function DialogoConfirmar({ titulo, children, confirmar, cancelar, onConfirmar, onCancelar }: Props) {
+export function DialogoConfirmar({ titulo, children, confirmar, cancelar, onConfirmar, onCancelar, confirmarDeshabilitado }: Props) {
   const botonCancelar = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export function DialogoConfirmar({ titulo, children, confirmar, cancelar, onConf
           >
             {cancelar}
           </button>
-          <button type="button" onClick={onConfirmar} className="min-h-11 rounded-lg bg-slate-800 px-4 font-medium text-white hover:bg-slate-700">
+          <button type="button" onClick={onConfirmar} disabled={confirmarDeshabilitado} className="min-h-11 rounded-lg bg-slate-800 px-4 font-medium text-white hover:bg-slate-700 disabled:opacity-50">
             {confirmar}
           </button>
         </div>

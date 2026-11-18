@@ -1,4 +1,10 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { useAuth } from '../auth/AuthContext'
+import { esAdmin } from '../auth/permisos'
+import { DialogoConfirmar } from '../components/examen/DialogoConfirmar'
+import { Aviso } from '../components/ui'
+import { anularExamen, mensajeErrorAdmin } from '../lib/admin'
 import { BotonPdf } from '../components/BotonPdf'
 import { Cargando } from '../components/Cargando'
 import { ErrorCarga } from '../components/ErrorCarga'
@@ -8,7 +14,7 @@ import { formatearFecha, textoDiasRestantes } from '../lib/fechas'
 import { TIPOS, type ExamenConEstado } from '../lib/habilitaciones'
 import { useConsulta } from '../lib/useConsulta'
 
-function Examen({ ex, empresa }: { ex: ExamenConEstado; empresa: string }) {
+function Examen({ ex, empresa, onAnular }: { ex: ExamenConEstado; empresa: string; onAnular?: () => void }) {
   return (
     <li className={`rounded-xl border bg-white p-4 shadow-sm ${ex.anulado ? 'border-dashed border-slate-300 opacity-75' : 'border-slate-200'}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -50,7 +56,14 @@ function Examen({ ex, empresa }: { ex: ExamenConEstado; empresa: string }) {
           </>
         )}
       </dl>
-      <BotonPdf path={ex.pdf_path} className="mt-3" />
+      <div className="mt-3 flex flex-wrap items-start gap-2">
+        <BotonPdf path={ex.pdf_path} />
+        {onAnular && !ex.anulado && (
+          <button type="button" onClick={onAnular} className="min-h-9 rounded-md border border-red-200 bg-white px-3 text-sm font-medium text-red-700 hover:bg-red-50">
+            Anular
+          </button>
+        )}
+      </div>
     </li>
   )
 }
@@ -60,8 +73,27 @@ export function DetallePersona() {
   const persona = useConsulta(() => obtenerPersona(id), [id])
   const historial = useConsulta(() => obtenerHistorial(id), [id])
   const empresas = useConsulta(obtenerEmpresas, [])
+  const { perfil } = useAuth()
+  const [anulando, setAnulando] = useState<ExamenConEstado | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const [errorAnular, setErrorAnular] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
 
-  if (persona.cargando || historial.cargando) return <Cargando />
+  async function confirmarAnulacion() {
+    if (!anulando || !motivo.trim()) return
+    setErrorAnular(null)
+    try {
+      await anularExamen(anulando.id, motivo)
+      setAnulando(null)
+      setMotivo('')
+      setAviso(`Se anuló el examen del ${formatearFecha(anulando.fecha_examen)}.`)
+      historial.recargar()
+    } catch (e) {
+      setErrorAnular(mensajeErrorAdmin(e))
+    }
+  }
+
+  if ((persona.cargando && !persona.datos) || (historial.cargando && !historial.datos)) return <Cargando />
   if (persona.error || historial.error) {
     return <ErrorCarga recargar={() => (persona.recargar(), historial.recargar())} />
   }
@@ -100,14 +132,38 @@ export function DetallePersona() {
       </div>
 
       <h2 className="text-lg font-semibold text-slate-900">Historial de exámenes</h2>
+      {aviso && <Aviso tipo="ok">{aviso}</Aviso>}
       {examenes.length === 0 ? (
         <p className="text-slate-600">No tiene exámenes cargados.</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {examenes.map((ex) => (
-            <Examen key={ex.id} ex={ex} empresa={nombreEmpresa.get(ex.empresa_id) ?? ''} />
+            <Examen
+              key={ex.id}
+              ex={ex}
+              empresa={nombreEmpresa.get(ex.empresa_id) ?? ''}
+              onAnular={esAdmin(perfil) ? () => (setAnulando(ex), setMotivo(''), setErrorAnular(null), setAviso(null)) : undefined}
+            />
           ))}
         </ul>
+      )}
+
+      {anulando && (
+        <DialogoConfirmar
+          titulo={`Anular el examen del ${formatearFecha(anulando.fecha_examen)}`}
+          confirmar="Anular examen"
+          cancelar="Cancelar"
+          confirmarDeshabilitado={!motivo.trim()}
+          onConfirmar={() => void confirmarAnulacion()}
+          onCancelar={() => setAnulando(null)}
+        >
+          <p className="text-sm">El examen no se borra: queda en el historial marcado como anulado y deja de contar como habilitación. No se puede deshacer.</p>
+          <label className="mt-3 flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Motivo
+            <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} className="rounded-lg border border-slate-300 px-3 py-2 text-base font-normal" />
+          </label>
+          {errorAnular && <div className="mt-2"><Aviso tipo="error">{errorAnular}</Aviso></div>}
+        </DialogoConfirmar>
       )}
     </section>
   )
