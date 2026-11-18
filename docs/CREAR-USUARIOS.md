@@ -42,6 +42,10 @@ Si el mail no existe en Supabase, la app te avisa. Revisá que esté bien escrit
 Pasale la dirección de la app, su mail y la contraseña. Si quiere cambiarla, en la pantalla de
 ingreso tiene **Olvidé mi contraseña**.
 
+> El mail de "Olvidé mi contraseña" lo manda Supabase con su servidor gratuito, que manda pocos
+> mails por hora y puede no llegar a direcciones de afuera del equipo de Supabase. Si no le llega,
+> lo más simple es borrar el usuario en Supabase y crearlo de nuevo con otra contraseña (pasos 1 y 2).
+
 ## Otras tareas
 
 Todo en **Administración → Usuarios**, en la lista:
