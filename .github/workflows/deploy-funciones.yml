@@ -1,0 +1,46 @@
+# Sube las Edge Functions a Supabase cuando cambian en main (o a mano desde
+# GitHub → Actions → "Subir funciones a Supabase" → Run workflow).
+#
+# Necesita, en GitHub → Settings → Secrets and variables → Actions:
+#   - Secret   SUPABASE_ACCESS_TOKEN  (Supabase → Account → Access Tokens)
+#   - Variable SUPABASE_PROJECT_REF   (el "ref" del proyecto)
+# Solo sube las funciones: no toca la base de datos.
+name: Subir funciones a Supabase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/deploy-funciones.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-funciones
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: Revisar configuración
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then
+            echo "::error::Faltan el secret SUPABASE_ACCESS_TOKEN o la variable SUPABASE_PROJECT_REF (ver README, sección 4)."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Subir avisos-vencimiento
+        run: supabase functions deploy avisos-vencimiento --project-ref "$PROJECT_REF"
+      - name: Subir invitar-usuario
+        run: supabase functions deploy invitar-usuario --project-ref "$PROJECT_REF"

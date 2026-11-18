@@ -117,12 +117,29 @@ SQL Editor: `update habilitaciones.configuracion set dias_aviso = '{30,15,7,0}';
    - **Gmail**: activá la verificación en dos pasos en la cuenta y creá una
      [contraseña de aplicación](https://myaccount.google.com/apppasswords). Se usa el puerto 465,
      porque Supabase bloquea el 587.
-2. Copiá `supabase/functions/.env.example` a `supabase/functions/.env`, completalo y subilo:
+   Si el proyecto ya tiene `RESEND_API_KEY` de otra app, podés usar la misma o, si esta app usa
+   otra cuenta de Resend, cargar su key como `HABILITACIONES_RESEND_API_KEY` (tiene prioridad y
+   no pisa la de la otra app).
+2. Cargá los secretos de [`supabase/functions/.env.example`](supabase/functions/.env.example) en
+   **Supabase → Edge Functions → Secrets** (se pueden pegar todos juntos como `NOMBRE=valor`), o
+   desde la terminal con `npx supabase secrets set --env-file supabase/functions/.env`.
+3. Subí las funciones, de una de estas dos formas:
+   - **Desde GitHub, sin terminal** (queda automático para los cambios futuros):
+     1. En Supabase → tu cuenta (arriba a la derecha) → **Access Tokens** → **Generate new token**.
+     2. En GitHub → el repo → **Settings → Secrets and variables → Actions**:
+        - pestaña **Secrets** → **New repository secret**: `SUPABASE_ACCESS_TOKEN` con el token;
+        - pestaña **Variables** → **New repository variable**: `SUPABASE_PROJECT_REF` con el `ref`.
+     3. En **Actions → Subir funciones a Supabase → Run workflow**. Después corre sola cada vez
+        que se mergea un cambio en `supabase/functions/`.
+   - **Desde la terminal**:
 
-   ```bash
-   npx supabase secrets set --env-file supabase/functions/.env
-   npx supabase functions deploy avisos-vencimiento
-   ```
+     ```bash
+     npx supabase login
+     npx supabase functions deploy avisos-vencimiento --project-ref <ref>
+     npx supabase functions deploy invitar-usuario --project-ref <ref>
+     ```
+
+   Subir las funciones no toca la base de datos ni otras apps del proyecto.
 
 ### Programar el cron
 
@@ -136,6 +153,27 @@ select vault.create_secret('<CRON_SECRET>', 'habilitaciones_cron_secret');
 ```
 
 ### Probarlo
+
+Desde el **SQL Editor**, sin terminal (usa la URL y el secreto guardados en Vault, así que también
+prueba que el cron esté bien configurado):
+
+```sql
+-- Pide un ensayo: arma el mail de hoy sin mandarlo ni registrarlo
+select net.http_post(
+  url := (select decrypted_secret from vault.decrypted_secrets where name = 'habilitaciones_avisos_url'),
+  body := '{"prueba":true}'::jsonb,
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret',
+    (select decrypted_secret from vault.decrypted_secrets where name = 'habilitaciones_cron_secret'))
+);
+
+-- Unos segundos después, la respuesta (status 200 = todo bien)
+select status_code, content from net._http_response order by created desc limit 1;
+
+-- Para mandarlo de verdad (lo mismo que hace el cron a las 8:00)
+select habilitaciones_priv.disparar_avisos();
+```
+
+O desde una terminal:
 
 ```bash
 # Muestra qué mail saldría hoy, sin mandarlo ni registrarlo
@@ -170,12 +208,8 @@ no se borra: queda en el historial marcado como anulado y deja de contar como ha
 
 Las invitaciones las manda Supabase Auth con la Edge Function `invitar-usuario`:
 
-1. Subí la función (usa el mismo `APP_URL` de `supabase/functions/.env`):
-
-   ```bash
-   npx supabase secrets set --env-file supabase/functions/.env
-   npx supabase functions deploy invitar-usuario
-   ```
+1. Subí la función `invitar-usuario` igual que en la sección 4 (con GitHub se sube junto con la
+   otra). Usa el mismo secreto `APP_URL`.
 
 2. El servidor de mail que trae Supabase de fábrica manda muy pocos mails por hora y solo a
    miembros del equipo del proyecto. Para invitar a cualquier dirección configurá un SMTP propio
