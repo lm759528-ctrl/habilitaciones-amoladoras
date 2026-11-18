@@ -88,7 +88,7 @@ También se pueden crear con la opción B, cambiando `'admin'` por `'seguridad'`
    | Variable | Valor |
    |---|---|
    | `VITE_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-   | `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon` / publishable key |
+   | `VITE_SUPABASE_ANON_KEY` (o `VITE_SUPABASE_PUBLISHABLE_KEY`) | Supabase → Project Settings → API → `anon` / publishable key |
    | `VITE_APP_TITLE` | El título que quieras mostrar (opcional) |
 
 4. Guardá y hacé **Retry deployment** para que el build tome las variables.
