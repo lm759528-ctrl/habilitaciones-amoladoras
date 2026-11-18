@@ -20,7 +20,8 @@ psql_db -c 'create schema extensions'
 psql_db -f scripts/local/supabase_shim.sql
 for f in supabase/migrations/*.sql; do
   echo "Aplicando $f"
-  psql_db -f "$f"
+  # pg_cron y pg_net no vienen en un Postgres común: el shim los imita.
+  sed -E '/^create extension if not exists pg_(cron|net) /d' "$f" | psql_db
 done
 
 pg_prove -d "$DB" supabase/tests/database/*.test.sql

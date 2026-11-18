@@ -4,7 +4,7 @@ Aplicación web para registrar los exámenes prácticos de uso de amoladoras ang
 generar el PDF de la planilla y controlar qué operarios están habilitados, por vencer o
 vencidos. La spec completa está en [`docs/SPEC.md`](docs/SPEC.md).
 
-> Estado: **etapa 4 (nuevo examen y PDF)**. Los avisos por mail y la administración llegan en las etapas siguientes; este README se completa en cada una.
+> Estado: **etapa 5 (avisos por mail)**. La administración llega en la etapa 6.
 
 Stack: React + Vite + TypeScript + Tailwind CSS, Supabase (Auth, Postgres, Storage) y
 Cloudflare Pages.
@@ -74,6 +74,57 @@ Los demás usuarios (Seguridad e Higiene) se invitan desde la pantalla de Admini
 El repo ya trae `public/_redirects` (para que funcionen las rutas al recargar la página) y
 `public/_headers` (cabeceras de seguridad). Si preferís publicar desde la terminal en vez de
 conectar el repo: `npm run build && npx wrangler pages deploy`.
+
+## 4. Avisos de vencimiento por mail
+
+Todos los días a las 8:00 (hora de Argentina) se manda **un solo mail** a `ALERT_EMAIL` con las
+habilitaciones que vencen dentro de los umbrales (por defecto a los 30 días, a los 7 y el mismo
+día). Cada aviso sale una sola vez (queda registrado en `avisos_enviados`) y no se avisa de
+personas que ya renovaron ni de personas dadas de baja. Si un día no hay nada para avisar, no
+llega mail.
+
+Los umbrales están en la tabla `configuracion` (columna `dias_aviso`). Para cambiarlos, en el
+SQL Editor: `update configuracion set dias_aviso = '{30,15,7,0}';`
+
+### Configurar el envío
+
+1. Elegí cómo mandar los mails:
+   - **Resend** (recomendado): creá una cuenta en [resend.com](https://resend.com), verificá tu
+     dominio y generá una API key.
+   - **Gmail**: activá la verificación en dos pasos en la cuenta y creá una
+     [contraseña de aplicación](https://myaccount.google.com/apppasswords). Se usa el puerto 465,
+     porque Supabase bloquea el 587.
+2. Copiá `supabase/functions/.env.example` a `supabase/functions/.env`, completalo y subilo:
+
+   ```bash
+   npx supabase secrets set --env-file supabase/functions/.env
+   npx supabase functions deploy avisos-vencimiento
+   ```
+
+### Programar el cron
+
+La migración `20261118000500_cron_avisos.sql` ya deja programado el job `avisos-vencimiento`
+(`0 11 * * *`, o sea 8:00 en Argentina). Falta decirle a qué URL llamar y con qué secreto.
+En el **SQL Editor** de Supabase ejecutá, con tu `ref` y el mismo `CRON_SECRET` del paso anterior:
+
+```sql
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/avisos-vencimiento', 'avisos_url');
+select vault.create_secret('<CRON_SECRET>', 'avisos_cron_secret');
+```
+
+### Probarlo
+
+```bash
+# Muestra qué mail saldría hoy, sin mandarlo ni registrarlo
+curl -X POST "https://<ref>.supabase.co/functions/v1/avisos-vencimiento" \
+  -H "x-cron-secret: <CRON_SECRET>" -d '{"prueba":true}'
+
+# Lo manda de verdad (lo mismo que hace el cron)
+curl -X POST "https://<ref>.supabase.co/functions/v1/avisos-vencimiento" -H "x-cron-secret: <CRON_SECRET>"
+```
+
+Para ver las ejecuciones del cron: `select * from cron.job_run_details order by start_time desc limit 10;`.
+Los errores de la función aparecen en **Edge Functions → avisos-vencimiento → Logs**.
 
 ## Desarrollo local
 
