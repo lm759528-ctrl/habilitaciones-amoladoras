@@ -1,0 +1,5 @@
+# Para publicar desde la terminal con: npx wrangler pages deploy
+# (si conectás el repo en el panel de Cloudflare Pages, este archivo es opcional)
+name = "habilitaciones-amoladoras"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-01"
