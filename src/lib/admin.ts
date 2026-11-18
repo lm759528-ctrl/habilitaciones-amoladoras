@@ -68,17 +68,14 @@ export async function actualizarUsuario(id: string, cambios: Partial<Pick<Usuari
 }
 
 /**
- * Invita por email (Edge Function invitar-usuario, que usa la service role key).
- * Devuelve `existente: true` si el email ya tenía cuenta en el proyecto de
- * Supabase (por ejemplo, de otra app): no se manda mail y entra con su contraseña.
+ * Da acceso a la app a un usuario que ya existe en Supabase
+ * (Authentication → Users → Add user). No manda mails: lo hace la función
+ * habilitaciones.dar_acceso de la base, que solo puede usar un admin.
+ * Si ya tenía acceso, le actualiza el nombre y el rol y lo reactiva.
  */
-export async function invitarUsuario(datos: { email: string; nombre: string; rol: Rol }): Promise<{ existente: boolean }> {
-  const { data, error } = await supabase.functions.invoke('invitar-usuario', { body: datos })
-  if (!error) return { existente: Boolean(data?.existente) }
-  // FunctionsHttpError trae la respuesta de la función con el motivo.
-  const respuesta = (error as { context?: Response }).context
-  const cuerpo = respuesta ? await respuesta.json().catch(() => null) : null
-  throw new Error(cuerpo?.error ?? 'No se pudo enviar la invitación.')
+export async function darAcceso(datos: { email: string; nombre: string; rol: Rol }): Promise<void> {
+  const { error } = await supabase.rpc('dar_acceso', { p_email: datos.email.trim(), p_nombre: datos.nombre.trim(), p_rol: datos.rol })
+  if (error) throw error
 }
 
 // --- Exámenes ---------------------------------------------------------------

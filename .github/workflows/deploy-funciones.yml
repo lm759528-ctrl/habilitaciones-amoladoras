@@ -42,5 +42,3 @@ jobs:
           version: latest
       - name: Subir avisos-vencimiento
         run: supabase functions deploy avisos-vencimiento --project-ref "$PROJECT_REF"
-      - name: Subir invitar-usuario
-        run: supabase functions deploy invitar-usuario --project-ref "$PROJECT_REF"

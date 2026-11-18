@@ -9,7 +9,7 @@ select plan(45);
 -- Datos de prueba (como postgres, dueño de las tablas)
 -- ---------------------------------------------------------------------------
 insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data) values
-  ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local',     '{"habilitaciones_rol":"admin","nombre":"Ana Admin"}', '{}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local',     '{"habilitaciones_rol":"admin","habilitaciones_nombre":"Ana Admin"}', '{}'),
   ('00000000-0000-0000-0000-0000000000a2', 'seguridad@test.local', '{"habilitaciones_rol":"seguridad"}', '{}'),
   -- Usuario sin rol en app_metadata (p. ej. un registro público por error),
   -- que además intenta darse admin por user_metadata. Tiene un "rol" de otra app

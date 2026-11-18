@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { perfil, renderConAuth, sesion } from '../test/renderConAuth'
 import { Administracion } from './Administracion'
 
-const invitar = vi.fn(async (_d: unknown) => ({ existente: false }))
+const darAcceso = vi.fn(async (_d: unknown) => {})
 const guardarEmpresa = vi.fn(async (_d: unknown) => {})
 
 vi.mock('../lib/admin', () => ({
@@ -11,7 +11,7 @@ vi.mock('../lib/admin', () => ({
     { id: 'u1', nombre: 'Usuario Test', email: 'test@test.local', rol: 'admin', activo: true },
     { id: 'u2', nombre: 'Laura Seguridad', email: 'laura@planta.local', rol: 'seguridad', activo: true },
   ],
-  invitarUsuario: (d: unknown) => invitar(d),
+  darAcceso: (d: unknown) => darAcceso(d),
   actualizarUsuario: vi.fn(async () => {}),
   guardarEmpresa: (d: unknown) => guardarEmpresa(d),
   guardarPersona: vi.fn(async () => {}),
@@ -41,25 +41,17 @@ describe('Administracion', () => {
     await waitFor(() => expect(guardarEmpresa).toHaveBeenCalledWith(expect.objectContaining({ nombre: 'Montajes del Sur' })))
   })
 
-  it('invita un usuario de Seguridad e Higiene', async () => {
+  it('da acceso a un usuario ya creado en Supabase', async () => {
     render('/admin?seccion=usuarios')
     expect(await screen.findByText('Laura Seguridad')).toBeInTheDocument()
     expect(screen.getByText(/\(vos\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/invitación/i)).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'nuevo@planta.local' } })
     fireEvent.change(screen.getByLabelText(/Nombre/), { target: { value: 'Pedro Gómez' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar invitación' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dar acceso' }))
     await waitFor(() =>
-      expect(invitar).toHaveBeenCalledWith(expect.objectContaining({ email: 'nuevo@planta.local', nombre: 'Pedro Gómez' })),
+      expect(darAcceso).toHaveBeenCalledWith(expect.objectContaining({ email: 'nuevo@planta.local', nombre: 'Pedro Gómez', rol: 'seguridad' })),
     )
-  })
-
-  it('si el email ya tenía cuenta de otra app, avisa que entra con su contraseña', async () => {
-    invitar.mockResolvedValueOnce({ existente: true })
-    render('/admin?seccion=usuarios')
-    await screen.findByText('Laura Seguridad')
-    fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'ya@planta.local' } })
-    fireEvent.change(screen.getByLabelText(/Nombre/), { target: { value: 'Ya Existe' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar invitación' }))
-    expect(await screen.findByText(/ya tenía cuenta/)).toBeInTheDocument()
+    expect(await screen.findByText(/ya puede entrar como Seguridad e Higiene/)).toBeInTheDocument()
   })
 })

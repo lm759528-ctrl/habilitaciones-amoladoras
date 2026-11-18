@@ -42,7 +42,7 @@ Pasos:
 4. En **Authentication → URL Configuration → Redirect URLs**, agregá
    `https://habilitaciones-amoladoras.pages.dev/nueva-contrasena`
    (y `http://localhost:5173/nueva-contrasena` si vas a probar en tu PC). Es adonde llevan los
-   links de invitación y de "olvidé mi contraseña".
+   links de "olvidé mi contraseña".
 5. Opciones de login que valen para todo el proyecto (si lo compartís, decidí pensando en la otra app):
    - **Site URL**: si el proyecto es solo de esta app, poné la dirección de Cloudflare. Si es
      compartido, dejá la de la otra app: esta app siempre manda su propia dirección de regreso.
@@ -71,7 +71,7 @@ en el **SQL Editor**, cambiando el email y el nombre.
 > La `service_role` key saltea todos los permisos. Usala solo en tu PC: nunca la pongas en
 > variables `VITE_*` ni en Cloudflare.
 
-Los demás usuarios se invitan desde la pantalla de **Administración** (ver sección 5).
+Los demás usuarios se crean igual y se les da acceso desde **Administración** (ver sección 5).
 También se pueden crear con la opción B, cambiando `'admin'` por `'seguridad'` en el SQL.
 
 ## 3. Publicar en Cloudflare Pages
@@ -136,7 +136,6 @@ SQL Editor: `update habilitaciones.configuracion set dias_aviso = '{30,15,7,0}';
      ```bash
      npx supabase login
      npx supabase functions deploy avisos-vencimiento --project-ref <ref>
-     npx supabase functions deploy invitar-usuario --project-ref <ref>
      ```
 
    Subir las funciones no toca la base de datos ni otras apps del proyecto.
@@ -195,30 +194,23 @@ La pantalla **Administración** (solo admin) tiene tres solapas:
   dada de baja no aparece en el listado ni recibe avisos, pero conserva su historial.
 - **Empresas**: alta, cambio de nombre y baja/reactivación. Las empresas dadas de baja no se
   ofrecen al cargar exámenes nuevos; los exámenes viejos mantienen su empresa.
-- **Usuarios**: invitar por mail (rol Administrador o Seguridad e Higiene), cambiar el rol y
+- **Usuarios**: dar acceso a un usuario ya creado en Supabase (ver abajo), cambiar el rol y
   dar de baja/reactivar. Un usuario dado de baja no ve nada aunque tenga contraseña. La base
-  no deja quitar ni dar de baja al último administrador activo. Si el email ya tiene cuenta en
-  el proyecto de Supabase (por ejemplo, de la otra app), no se manda mail: se le da acceso y
-  entra con la contraseña que ya tiene.
+  no deja quitar ni dar de baja al último administrador activo.
 
 En el detalle de una persona, el admin puede **anular** un examen indicando el motivo. El examen
 no se borra: queda en el historial marcado como anulado y deja de contar como habilitación.
 
-### Configurar las invitaciones
+### Crear usuarios
 
-Las invitaciones las manda Supabase Auth con la Edge Function `invitar-usuario`:
+Los usuarios se crean siempre a mano (la app no manda invitaciones):
 
-1. Subí la función `invitar-usuario` igual que en la sección 4 (con GitHub se sube junto con la
-   otra). Usa el mismo secreto `APP_URL`.
-
-2. El servidor de mail que trae Supabase de fábrica manda muy pocos mails por hora y solo a
-   miembros del equipo del proyecto. Para invitar a cualquier dirección configurá un SMTP propio
-   en **Authentication → Emails → SMTP Settings** (sirven Resend, con host `smtp.resend.com`,
-   puerto 465, usuario `resend` y la API key como contraseña, o Gmail con contraseña de aplicación).
-3. Revisá que `https://<tu-app>/nueva-contrasena` esté en las **Redirect URLs** (sección 1).
-   El link de la invitación lleva ahí para que la persona elija su contraseña.
-4. Opcional: en **Authentication → Emails → Templates → Invite user** podés traducir el mail
-   al español.
+1. En Supabase → **Authentication → Users → Add user → Create new user**: cargá el mail y una
+   contraseña, marcá **Auto Confirm User** y tocá **Create user**. (Si la persona ya tiene usuario
+   en el proyecto, por ejemplo de otra app, salteá este paso.)
+2. En la app → **Administración → Usuarios → Dar acceso a un usuario**: el mismo mail, el nombre y
+   el rol (Administrador o Seguridad e Higiene).
+3. Pasale la contraseña a la persona. La puede cambiar con "Olvidé mi contraseña" en el ingreso.
 
 ## Desarrollo local
 
