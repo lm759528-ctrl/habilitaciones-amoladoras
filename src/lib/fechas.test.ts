@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatearFecha, textoDiasRestantes } from './fechas'
+import { formatearFecha, hoyAR, textoDiasRestantes } from './fechas'
 
 describe('formatearFecha', () => {
   it('muestra dd/mm/aaaa', () => {
@@ -27,5 +27,12 @@ describe('textoDiasRestantes', () => {
     [-5, 'Venció hace 5 días'],
   ])('%s → %s', (dias, texto) => {
     expect(textoDiasRestantes(dias)).toBe(texto)
+  })
+})
+
+describe('hoyAR', () => {
+  it('usa la fecha de Argentina, no la de UTC', () => {
+    expect(hoyAR(new Date('2026-11-19T02:30:00Z'))).toBe('2026-11-18')
+    expect(hoyAR(new Date('2026-11-19T03:30:00Z'))).toBe('2026-11-19')
   })
 })

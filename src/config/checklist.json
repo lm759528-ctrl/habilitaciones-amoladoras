@@ -1,0 +1,63 @@
+{
+  "$comentario": "Checklist del examen práctico. Se puede cambiar el texto, agregar o quitar puntos y secciones sin tocar el código. Cada 'id' tiene que ser único y no conviene cambiarlo una vez usado. Si cambiás la lista, subí 'version'. Los exámenes ya cargados guardan su propia copia, así que no se alteran.",
+  "version": 1,
+  "secciones": [
+    {
+      "titulo": "Inspección previa",
+      "items": [
+        { "id": "previa_desconectada", "texto": "Amoladora desconectada de la energía" },
+        { "id": "previa_inspeccion_visual", "texto": "Inspección visual previo al uso" },
+        { "id": "previa_inspeccion_periodica", "texto": "Chequeo de la inspección periódica" },
+        { "id": "previa_boton_encendido", "texto": "Chequeo del botón de encendido" },
+        { "id": "previa_accesorios_seguridad", "texto": "Accesorios de seguridad instalados" },
+        { "id": "previa_manijas", "texto": "Manijas en correcta posición" },
+        { "id": "previa_proteccion", "texto": "Protección en correcta posición" }
+      ]
+    },
+    {
+      "titulo": "Chequeo de disco",
+      "items": [
+        { "id": "disco_adecuado_trabajo", "texto": "Adecuado para el trabajo a realizar" },
+        { "id": "disco_material", "texto": "Disco correcto para el material a utilizar" },
+        { "id": "disco_rpm", "texto": "Disco correcto para el tipo de amoladora según sus RPM" },
+        { "id": "disco_espesor_tamano", "texto": "Correcto espesor y tamaño para amolar" },
+        { "id": "disco_estado", "texto": "Estado del disco" }
+      ]
+    },
+    {
+      "titulo": "Chequeo de accesorio",
+      "items": [
+        { "id": "accesorio_tipo_tarea", "texto": "Correcto para el tipo de tarea (amolado, corte, esmerilado, etc.)" },
+        { "id": "accesorio_rpm", "texto": "Correcta RPM para el tipo de amoladora" }
+      ]
+    },
+    {
+      "titulo": "Instalación del disco en la amoladora",
+      "items": [
+        { "id": "instalacion_desconectada", "texto": "Amoladora desconectada de la energía" },
+        { "id": "instalacion_herramienta", "texto": "Uso de la herramienta correcta (llave de extracción y ajuste)" },
+        { "id": "instalacion_ajuste_tuerca", "texto": "Correcto ajuste de la tuerca de sujeción" }
+      ]
+    },
+    {
+      "titulo": "Utilización / posición de trabajo",
+      "items": [
+        { "id": "uso_sujecion", "texto": "Sujeción de la herramienta" },
+        { "id": "uso_posicion_operador", "texto": "Posición del operador" },
+        { "id": "uso_sosten_pieza", "texto": "Forma de sostén de la pieza a trabajar" },
+        { "id": "uso_espacio_libre", "texto": "Espacio físico libre de obstáculos" },
+        { "id": "uso_vallas", "texto": "Utilización de vallas si corresponde" }
+      ]
+    },
+    {
+      "titulo": "EPP necesarios / estado",
+      "items": [
+        { "id": "epp_estado_general", "texto": "Estado general de los EPP" },
+        { "id": "epp_guantes", "texto": "Guantes de cuero puño largo" },
+        { "id": "epp_mascara", "texto": "Máscara facial" },
+        { "id": "epp_auditivos", "texto": "Protectores auditivos" },
+        { "id": "epp_delantal", "texto": "Delantal de cuero" }
+      ]
+    }
+  ]
+}

@@ -25,3 +25,10 @@ export function textoDiasRestantes(dias: number | null): string {
   const unidad = n === 1 ? 'día' : 'días'
   return dias > 0 ? `${n} ${unidad}` : `Venció hace ${n} ${unidad}`
 }
+
+const formatoIso = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' })
+
+/** Fecha de hoy en Argentina como 'aaaa-mm-dd'. */
+export function hoyAR(ahora: Date = new Date()): string {
+  return formatoIso.format(ahora)
+}

@@ -61,3 +61,59 @@ export async function linkFirmadoPdf(path: string): Promise<string> {
   if (error) throw error
   return data.signedUrl
 }
+
+// --- Carga de exámenes ---------------------------------------------------------
+
+export interface PersonaLista {
+  id: string
+  nombre: string
+  apellido: string
+  dni: string
+  activo: boolean
+  empresa_id: string
+}
+
+export async function obtenerPersonas(): Promise<PersonaLista[]> {
+  return o(await supabase.from('personas').select('id, nombre, apellido, dni, activo, empresa_id').order('apellido'))
+}
+
+export async function crearEmpresa(nombre: string): Promise<Empresa> {
+  return o(await supabase.from('empresas').insert({ nombre: nombre.trim() }).select('id, nombre, activo').single())
+}
+
+export async function crearPersona(p: Pick<PersonaLista, 'nombre' | 'apellido' | 'dni' | 'empresa_id'>): Promise<PersonaLista> {
+  return o(
+    await supabase
+      .from('personas')
+      .insert({ nombre: p.nombre.trim(), apellido: p.apellido.trim(), dni: p.dni, empresa_id: p.empresa_id })
+      .select('id, nombre, apellido, dni, activo, empresa_id')
+      .single(),
+  )
+}
+
+export async function subirPdf(path: string, bytes: Uint8Array): Promise<void> {
+  const { error } = await supabase.storage
+    .from(BUCKET_PDF)
+    .upload(path, new Blob([bytes as BlobPart], { type: 'application/pdf' }), { contentType: 'application/pdf', upsert: true })
+  if (error) throw error
+}
+
+export interface ExamenNuevo {
+  id: string
+  persona_id: string
+  fecha_examen: string
+  controlo: string
+  resultado: 'apto' | 'no_apto'
+  tipo_habilitacion: 'anual' | 'semestral' | 'tarea_puntual'
+  descripcion_tarea: string | null
+  fecha_inicio: string | null
+  fecha_vencimiento: string | null
+  respuestas: unknown
+  observaciones: string | null
+  pdf_path: string
+}
+
+export async function insertarExamen(e: ExamenNuevo): Promise<void> {
+  const { error } = await supabase.from('examenes').insert(e)
+  if (error) throw error
+}
